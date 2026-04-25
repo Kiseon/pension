@@ -7,17 +7,19 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <main>
-      <section class="hero">
+    <header class="topbar">
+      <div>
         <p class="eyebrow">Korea retirement income projection</p>
         <h1>노후 월수입 프로젝션</h1>
         <p>
           현재 재직 수입부터 퇴직금, 연금, IRP, 금융자산 인출까지 본인이
           100세가 되는 해까지 월별 세후 현금흐름을 계산합니다.
         </p>
-      </section>
+      </div>
+    </header>
 
-      <section class="grid">
+    <main class="app-shell">
+      <aside class="input-column">
         <form id="projection-form" class="panel">
           <h2>기본 입력</h2>
           <label>
@@ -125,26 +127,17 @@
 
           <button type="submit">프로젝션 계산</button>
         </form>
+      </aside>
 
-        <section class="panel results">
+      <section class="panel results">
           <h2>결과</h2>
           <div id="summary" class="summary muted">입력 후 계산 버튼을 누르세요.</div>
           <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>월</th>
-                  <th>나이</th>
-                  <th>명목수입</th>
-                  <th>실질수입</th>
-                  <th>부족액</th>
-                  <th>금융자산</th>
-                </tr>
-              </thead>
-              <tbody id="monthly-rows"></tbody>
+            <table id="projection-table">
+              <thead id="projection-head"></thead>
+              <tbody id="projection-body"></tbody>
             </table>
           </div>
-        </section>
       </section>
     </main>
 

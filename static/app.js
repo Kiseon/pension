@@ -1,12 +1,14 @@
 const form = document.querySelector("#projection-form");
 const summary = document.querySelector("#summary");
-const tableBody = document.querySelector("#monthly-rows");
+const tableHead = document.querySelector("#projection-head");
+const tableBody = document.querySelector("#projection-body");
 
 initializeMoneyInputs();
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   summary.textContent = "계산 중...";
+  tableHead.innerHTML = "";
   tableBody.innerHTML = "";
 
   const payload = payloadFromForm(new FormData(form));
@@ -109,18 +111,64 @@ function renderResult(data) {
     <div><strong>자산 소진 예상월</strong>: ${data.recommendation.depletion_month || "없음"}</div>
   `;
 
-  for (const row of data.monthly.slice(0, 240)) {
+  renderBreakdownTable(data.monthly);
+}
+
+function renderBreakdownTable(months) {
+  const sources = buildBreakdownRows(months);
+  const headerRow = document.createElement("tr");
+  headerRow.innerHTML = `
+    <th class="sticky-col">구분</th>
+    ${months.map((row) => `<th>${row.month}</th>`).join("")}
+  `;
+  tableHead.appendChild(headerRow);
+
+  for (const source of sources) {
     const tr = document.createElement("tr");
+    tr.className = source.kind === "expense" ? "expense-row" : "";
     tr.innerHTML = `
-      <td>${row.month}</td>
-      <td>${row.user_age}</td>
-      <td>${formatKrw(row.nominal_total)}</td>
-      <td>${formatKrw(row.real_total)}</td>
-      <td>${formatKrw(row.target_shortfall)}</td>
-      <td>${formatKrw(row.remaining_financial_assets)}</td>
+      <th class="sticky-col">
+        <span class="row-kind">${source.kindLabel}</span>
+        ${escapeHtml(source.label)}
+      </th>
+      ${months.map((row) => `<td>${formatKrw(source.values.get(row.month) || 0)}</td>`).join("")}
     `;
     tableBody.appendChild(tr);
   }
+}
+
+function buildBreakdownRows(months) {
+  const rows = new Map();
+  for (const month of months) {
+    for (const line of month.lines || []) {
+      const key = `${line.category}:${line.source}`;
+      if (!rows.has(key)) {
+        rows.set(key, {
+          label: line.source,
+          kind: line.amount < 0 ? "expense" : "income",
+          kindLabel: line.amount < 0 ? "지출" : "수입",
+          values: new Map()
+        });
+      }
+      rows.get(key).values.set(month.month, line.amount);
+    }
+
+    addSummaryRow(rows, "summary:nominal", "월 총수입", "summary", "합계", month.month, month.nominal_total);
+    addSummaryRow(rows, "summary:shortfall", "목표 대비 부족액", "summary", "부족", month.month, month.target_shortfall);
+    addSummaryRow(rows, "summary:assets", "잔여 금융자산", "summary", "잔액", month.month, month.remaining_financial_assets);
+  }
+
+  return Array.from(rows.values()).sort((left, right) => {
+    const rank = { income: 1, expense: 2, summary: 3 };
+    return rank[left.kind] - rank[right.kind] || left.label.localeCompare(right.label, "ko");
+  });
+}
+
+function addSummaryRow(rows, key, label, kind, kindLabel, month, value) {
+  if (!rows.has(key)) {
+    rows.set(key, { label, kind, kindLabel, values: new Map() });
+  }
+  rows.get(key).values.set(month, value);
 }
 
 function initializeMoneyInputs() {

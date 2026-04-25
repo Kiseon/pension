@@ -9,21 +9,36 @@ body {
   font-family: Arial, "Noto Sans KR", sans-serif;
 }
 
-header {
+.app-header {
   background: #111827;
   color: white;
-  padding: 32px;
+  padding: 20px 24px;
 }
 
-header p {
+.app-header h1 {
+  font-size: 28px;
+  margin: 4px 0 8px;
+}
+
+.app-header p {
   color: #d1d5db;
-  max-width: 760px;
+  margin: 0;
+  max-width: 960px;
 }
 
-main {
+.eyebrow {
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.app-layout {
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(320px, 440px) 1fr;
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
   padding: 24px;
 }
 
@@ -33,6 +48,23 @@ section {
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   padding: 20px;
+}
+
+.input-panel {
+  align-self: start;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+}
+
+.results {
+  min-width: 0;
+}
+
+.results-header {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
 }
 
 label {
@@ -114,6 +146,52 @@ thead {
   background: #f1f5f9;
 }
 
+.table-wrap {
+  overflow: auto;
+}
+
+.pivot-table {
+  min-width: max-content;
+}
+
+.pivot-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.pivot-table th:first-child,
+.pivot-table td:first-child {
+  background: white;
+  left: 0;
+  min-width: 180px;
+  position: sticky;
+  z-index: 2;
+}
+
+.pivot-table thead th:first-child {
+  background: #f1f5f9;
+  z-index: 3;
+}
+
+.pivot-row-total {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.pivot-row-income td:first-child {
+  border-left: 4px solid #16a34a;
+}
+
+.pivot-row-expense td:first-child {
+  border-left: 4px solid #dc2626;
+}
+
+.pivot-row-balance td:first-child,
+.pivot-row-target td:first-child {
+  border-left: 4px solid #2563eb;
+}
+
 .warning {
   background: #fff7ed;
   border: 1px solid #fed7aa;
@@ -122,8 +200,12 @@ thead {
 }
 
 @media (max-width: 920px) {
-  main {
+  .app-layout {
     grid-template-columns: 1fr;
+  }
+
+  .input-panel {
+    max-height: none;
   }
 
   .cards {
