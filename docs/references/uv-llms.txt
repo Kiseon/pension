@@ -1,0 +1,17 @@
+uv reference placeholder
+========================
+
+Purpose
+-------
+Capture uv and Python packaging notes when the implementation stack is selected.
+
+Current status
+--------------
+No runtime stack has been selected.
+
+Future content
+--------------
+- Project layout.
+- Dependency locking.
+- CI command examples.
+- Test command examples.
