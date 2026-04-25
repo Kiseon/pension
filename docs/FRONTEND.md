@@ -8,30 +8,35 @@ The interface should help households understand the shape of future monthly inco
 
 1. Household setup
    - Enter user's birthdate and spouse/partner birthdate.
-   - Select household status and retirement planning horizon.
-   - Define currency, region, and tax assumption profile.
+   - Select current work status, planned retirement age, and sudden retirement scenario.
+   - Use Korea/KRW as the fixed market context.
 2. Asset and income input
-   - Real estate: home, buildings, rental units, mortgages, maintenance costs.
-   - Rental income: monthly rent, vacancy assumptions, contract renewal rules.
-   - Pension income: public pension, private pension, annuity, employer pension.
-   - Savings and investments: balances, expected yield, withdrawal policy.
+   - Employment income through retirement target age.
+   - Severance pay and voluntary retirement compensation assumptions.
+   - Real estate income and costs without detailed property type modeling.
+   - Pension income: National Pension, private pension, employer pension, IRP, housing pension.
+   - Savings and investments: balances, expected yield, planned contributions, withdrawal policy.
    - Other income: part-time work, business income, family support.
 3. Scenario modeling
    - Base, conservative, and optimistic assumptions.
-   - Retirement age, pension start age, rental vacancy, inflation, investment return.
-   - One-time events such as sale of property or large medical expense.
+   - Retirement age, sudden retirement month, pension start age, inflation, investment return.
+   - Pension start timing alternatives that change monthly income amounts.
 4. Projection review
    - Monthly income chart by age.
    - Income source breakdown.
    - Shortfall and surplus indicators.
    - Assumption audit trail.
+   - Recommended drawdown plan to reach a target post-retirement monthly income.
+   - Additional monthly savings required before retirement if current assets are insufficient.
 
 ## Screen Map
 
 - Welcome and onboarding
 - Household profile
+- Work and retirement status
 - Asset inventory
 - Income source inventory
+- Pension timing optimizer
 - Assumption editor
 - Projection dashboard
 - Scenario comparison
@@ -50,7 +55,7 @@ The interface should help households understand the shape of future monthly inco
 
 - Monthly cashflow line chart.
 - Stacked income source chart.
-- Age milestone markers for pension start, spouse pension start, asset sale, and life expectancy assumptions.
+- Age milestone markers for retirement, sudden retirement, pension start, IRP drawdown, and age 100 horizon.
 - Table view for auditability and export.
 
 ## Reliability UX

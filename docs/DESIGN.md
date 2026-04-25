@@ -19,7 +19,7 @@ pretending the future is certain.
    - A plan is useful when users can compare base, conservative, optimistic, and
      stress scenarios.
 5. Make assumptions editable.
-   - Inflation, rent growth, vacancy, withdrawal rate, tax assumptions, and life
+   - Inflation, income-source growth, withdrawal rate, tax assumptions, and life
      expectancy should be explicit.
 
 ## Primary user journey
@@ -41,8 +41,8 @@ pretending the future is certain.
 - Household name
 - User birth date
 - Spouse birth date, optional
-- Country/currency
-- Desired projection horizon
+- Current employment status and retirement target age
+- Projection horizon fixed through the year the user turns 100
 
 ### Asset inventory
 
@@ -57,7 +57,7 @@ pretending the future is certain.
 
 - Inflation rate
 - Asset yield assumptions
-- Rent growth and vacancy assumptions
+- Income-source growth assumptions
 - Withdrawal strategy
 - Pension indexation
 - Tax and fee treatment
@@ -80,7 +80,7 @@ pretending the future is certain.
 
 ## Accessibility and localization
 
-- Korean language is the initial product language.
-- Currency and date formats must be locale-aware.
+- Korean language and Korea-market defaults are the initial product scope.
+- Amounts are shown in KRW and dates follow Korean user expectations.
 - Charts need tabular alternatives.
 - Key risk messages should not rely on color alone.

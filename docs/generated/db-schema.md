@@ -14,6 +14,10 @@ actual schema source instead of being edited manually.
 - IncomeStream
 - Scenario
 - AssumptionSet
+- KoreaRuleSource
+- EmploymentIncomePlan
+- RetirementBenefitEstimate
+- TargetIncomeRecommendation
 - ProjectionRun
 - MonthlyProjectionLine
 - ExplanationTrace

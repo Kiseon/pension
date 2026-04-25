@@ -56,7 +56,7 @@ Each output line should identify:
 | Unit | Pension starts in the configured month |
 | Boundary | February 29 birth date age calculation |
 | Golden | Couple with rental property and staggered pension starts |
-| Metamorphic | Higher vacancy rate cannot increase net rent |
+| Metamorphic | Higher property cost cannot increase net real estate income |
 | Contract | Projection API returns stable schema |
 | Privacy | Logs contain no raw birth dates or asset values |
 

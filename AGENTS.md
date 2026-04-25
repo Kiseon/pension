@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is planned as a reliability-first retirement income design service. Agents working here should preserve the product intent: help households project monthly retirement income by age using personal profile data, real estate assets, rental income, pensions, savings, investments, and other income-generating resources.
+This repository is planned as a reliability-first retirement income design service for Korea. Agents working here should preserve the product intent: help households project monthly after-tax income from the current working period through age 100 using personal profile data, labor income, severance payments, voluntary retirement incentives, real estate income and expenses, national pension, private pensions, housing pension, IRP, stocks, savings, investments, and other income-generating resources.
 
 ## Operating Principles
 
@@ -11,6 +11,8 @@ This repository is planned as a reliability-first retirement income design servi
 3. Prefer deterministic projection engines before introducing stochastic or AI-assisted recommendations.
 4. Keep personally identifiable information and financial data protected by default.
 5. Use Harness Engineering practices to improve reliability through automated tests, controlled deployments, observability, and repeatable verification gates.
+6. Use Korean rules, Korean won, and Korea-specific pension/tax adapters unless a future product decision explicitly expands scope.
+7. Do not hard-code external public rules directly in formulas without source, effective date, and version metadata.
 
 ## Expected Agent Workflow
 
@@ -23,6 +25,6 @@ This repository is planned as a reliability-first retirement income design servi
 ## Quality Bar
 
 - Projection calculations must be covered by automated examples and edge-case tests.
-- Assumptions such as inflation, pension start age, tax treatment, vacancy rate, rent growth, and investment return must be configurable.
+- Assumptions such as inflation, pension start age, tax treatment, income growth, rent growth, IRP contribution plan, and investment return must be configurable.
 - Releases must pass reliability gates before promotion.
-- User-facing output must clearly distinguish inputs, assumptions, projections, and warnings.
+- User-facing output must clearly distinguish inputs, assumptions, projections, recommendations, and warnings.

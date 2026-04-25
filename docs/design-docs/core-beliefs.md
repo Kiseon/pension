@@ -9,10 +9,10 @@
    Users need to understand when income arrives, from which source, and under what assumptions.
 
 3. **Couple-level planning must preserve person-level facts.**
-   Birth dates, pension start dates, ownership shares, and survivor effects differ by person.
+   Birth dates, pension start dates, employment status, and ownership shares differ by person.
 
 4. **Real estate income requires net modeling.**
-   Rent should be adjusted for vacancy, tax, maintenance, debt service, and management cost.
+   Rent should be modeled as monthly income minus user-entered monthly costs and allocated property taxes.
 
 5. **Every answer needs a trace.**
    A monthly income number must be explainable through input, rule, assumption, and calculation version.
