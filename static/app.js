@@ -154,13 +154,13 @@ function renderBreakdownTable(months) {
 
   for (const source of sources) {
     const tr = document.createElement("tr");
-    tr.className = source.kind === "expense" ? "expense-row" : "";
+    tr.className = rowClass(source);
     tr.innerHTML = `
       <th class="sticky-col">
         <span class="row-kind">${source.kindLabel}</span>
         ${escapeHtml(source.label)}
       </th>
-      ${months.map((row) => `<td>${formatKrw(source.values.get(row.month) || 0)}</td>`).join("")}
+      ${months.map((row) => cellHtml(source, row.month)).join("")}
     `;
     tableBody.appendChild(tr);
   }
@@ -184,12 +184,13 @@ function buildBreakdownRows(months) {
 
     addSummaryRow(rows, "summary:nominal", "월 총수입", "summary", "합계", month.month, month.nominal_total);
     addSummaryRow(rows, "summary:shortfall", "목표 대비 부족액", "summary", "부족", month.month, month.target_shortfall);
-    addSummaryRow(rows, "summary:assets", "잔여 금융자산", "summary", "잔액", month.month, month.remaining_financial_assets);
-    addSummaryRow(rows, "summary:stock", "주식잔고", "summary", "잔액", month.month, month.stock_balance);
+    addSummaryRow(rows, "balance:cash", "현금 잔액", "balance", "잔액", month.month, month.cash_balance);
+    addSummaryRow(rows, "balance:stock", "주식 잔액", "balance", "잔액", month.month, month.stock_balance);
+    addSummaryRow(rows, "balance:retirement", "퇴직연금 잔액", "balance", "잔액", month.month, month.retirement_balance);
   }
 
   return Array.from(rows.values()).sort((left, right) => {
-    const rank = { income: 1, expense: 2, summary: 3 };
+    const rank = { income: 1, expense: 2, summary: 3, balance: 4 };
     return rank[left.kind] - rank[right.kind] || left.label.localeCompare(right.label, "ko");
   });
 }
@@ -199,6 +200,32 @@ function addSummaryRow(rows, key, label, kind, kindLabel, month, value) {
     rows.set(key, { label, kind, kindLabel, values: new Map() });
   }
   rows.get(key).values.set(month, value);
+}
+
+function rowClass(source) {
+  const classes = [];
+  if (source.kind === "expense") {
+    classes.push("expense-row");
+  }
+  if (source.kind === "summary") {
+    classes.push("summary-row");
+  }
+  if (source.kind === "balance") {
+    classes.push("balance-row");
+  }
+  if (source.label === "현금 잔액") {
+    classes.push("cash-balance-row");
+    if (Array.from(source.values.values()).some((value) => Number(value) < 0)) {
+      classes.push("negative-cash");
+    }
+  }
+  return classes.join(" ");
+}
+
+function cellHtml(source, month) {
+  const value = source.values.get(month) || 0;
+  const className = source.label === "현금 잔액" && Number(value) < 0 ? " class=\"negative\"" : "";
+  return `<td${className}>${formatKrw(value)}</td>`;
 }
 
 function initializeMoneyInputs() {

@@ -116,6 +116,12 @@ label {
   margin: 10px 0;
 }
 
+.field-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
 input {
   background: #fbfdff;
   border: 1px solid #cbd5e1;
@@ -277,6 +283,11 @@ tbody tr:nth-child(even) .sticky-col {
   color: #a33a35;
 }
 
+.negative-cash {
+  color: #c2413b;
+  font-weight: 800;
+}
+
 .error {
   color: #fecaca;
 }
@@ -292,6 +303,10 @@ tbody tr:nth-child(even) .sticky-col {
   }
 
   .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row {
     grid-template-columns: 1fr;
   }
 }

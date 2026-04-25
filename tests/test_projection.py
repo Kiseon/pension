@@ -76,6 +76,19 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(result["projection_end"], "2070-12")
         self.assertEqual(result["monthly"][0]["user_age"], 55)
 
+    def test_projection_runs_to_age_100_even_when_cash_is_negative(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["financial_assets"][0]["balance"] = 0
+        payload["irp"]["current_balance"] = 0
+        payload["irp"]["monthly_contribution"] = 0
+        payload["expenses"]["monthly_living_expense"] = 10_000_000
+
+        result = project(payload)
+
+        self.assertEqual(result["projection_end"], "2070-12")
+        self.assertLess(result["monthly"][-1]["cash_balance"], 0)
+
     def test_employment_income_stops_and_retirement_payout_starts(self):
         result = project(sample_payload())
         retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
@@ -121,6 +134,8 @@ class ProjectionTests(unittest.TestCase):
     def test_irp_contributions_stop_at_retirement_month(self):
         payload = sample_payload()
         payload["target_monthly_income"] = 0
+        payload["employment"]["retirement_allowance"] = 0
+        payload["employment"]["voluntary_retirement_bonus"] = 0
         payload["financial_assets"] = []
         payload["irp"] = {
             "current_balance": 0,
@@ -135,13 +150,14 @@ class ProjectionTests(unittest.TestCase):
         retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
         after_retirement = next(row for row in result["monthly"] if row["month"] == "2030-06")
 
-        self.assertEqual(before_retirement["remaining_financial_assets"], 5200)
-        self.assertEqual(retirement_row["remaining_financial_assets"], 5200)
-        self.assertEqual(after_retirement["remaining_financial_assets"], 5200)
+        self.assertEqual(before_retirement["retirement_balance"], 5200)
+        self.assertEqual(retirement_row["retirement_balance"], 5200)
+        self.assertEqual(after_retirement["retirement_balance"], 5200)
 
     def test_recommendation_reports_shortfall_when_target_is_too_high(self):
         payload = sample_payload()
         payload["target_monthly_income"] = 20_000_000
+        payload["expenses"]["monthly_living_expense"] = 25_000_000
         payload["financial_assets"][0]["balance"] = 1_000_000
         payload["irp"]["current_balance"] = 0
         payload["irp"]["monthly_contribution"] = 0

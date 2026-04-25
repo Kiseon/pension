@@ -10,7 +10,7 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await page.getByLabel("퇴직 후 목표 월수입").fill("4,800,000");
   await page.getByLabel("현재 월 세후 근로소득").fill("6,100,000");
   await page.getByLabel("근로소득 연 상승률(%)").fill("2.5");
-  await page.getByLabel("월 생활비").fill("3,000,000");
+  await page.getByLabel("월 생활비").fill("12,000,000");
   await page.getByLabel("예상 퇴직금").fill("150,000,000");
   await page.getByLabel("희망퇴직위로금").fill("25,000,000");
   await page.getByLabel("퇴직금/위로금 수령 시작 연도").fill("2034");
@@ -58,10 +58,13 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await expect(page.locator("#projection-body")).toContainText("생활비");
   await expect(page.locator("#projection-body")).toContainText("퇴직금/위로금 월수령");
   await expect(page.locator("#projection-body")).toContainText("주택연금");
-  await expect(page.locator("#projection-body")).toContainText("주식잔고");
+  await expect(page.locator("#projection-body")).toContainText("현금 잔액");
+  await expect(page.locator("#projection-body")).toContainText("주식 잔액");
+  await expect(page.locator("#projection-body")).toContainText("퇴직연금 잔액");
   await expect(page.locator("#projection-body")).toContainText("부동산 월수입 수입");
   await expect(page.locator("#projection-body")).toContainText("월 총수입");
   const employmentRow = page.locator("#projection-body tr").filter({ hasText: "근로소득" });
   await expect(employmentRow).toContainText("6,100,000");
+  await expect(page.locator("#projection-body tr.negative-cash")).toHaveCount(1);
   await expect(page.locator("#projection-body")).not.toContainText("원");
 });
