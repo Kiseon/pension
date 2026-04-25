@@ -1,0 +1,71 @@
+{
+  "household": {
+    "user_birth_date": "1975-05-20",
+    "spouse_birth_date": "1977-09-10"
+  },
+  "start_month": "2026-01",
+  "target_monthly_income": 5000000,
+  "employment": {
+    "currently_employed": true,
+    "monthly_net_income": 6500000,
+    "income_growth_rate": 0.02,
+    "retirement_age": 60,
+    "retirement_allowance": 120000000,
+    "voluntary_retirement_bonus": 50000000
+  },
+  "real_estate": [
+    {
+      "name": "임대 부동산",
+      "monthly_income": 1500000,
+      "monthly_expense": 350000,
+      "income_growth_rate": 0.02,
+      "expense_growth_rate": 0.02
+    }
+  ],
+  "pensions": [
+    {
+      "name": "국민연금",
+      "type": "national_pension",
+      "target_monthly_amount": 1600000,
+      "normal_start_age": 65,
+      "start_age": 65,
+      "annual_increase_rate": 0.02
+    },
+    {
+      "name": "개인연금",
+      "type": "private_pension",
+      "target_monthly_amount": 800000,
+      "start_age": 60,
+      "annual_increase_rate": 0.01
+    },
+    {
+      "name": "주택연금",
+      "type": "housing_pension",
+      "target_monthly_amount": 900000,
+      "start_age": 70,
+      "annual_increase_rate": 0
+    }
+  ],
+  "financial_assets": [
+    {
+      "name": "주식 투자",
+      "balance": 150000000,
+      "annual_return_rate": 0.05,
+      "monthly_income": 250000,
+      "income_growth_rate": 0.02
+    },
+    {
+      "name": "예금",
+      "balance": 50000000,
+      "annual_return_rate": 0.03
+    }
+  ],
+  "irp": {
+    "current_balance": 80000000,
+    "monthly_contribution": 700000,
+    "annual_return_rate": 0.04
+  },
+  "assumptions": {
+    "inflation_rate": 0.025
+  }
+}
