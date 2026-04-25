@@ -107,6 +107,18 @@ body {
   padding-top: 0;
 }
 
+.field-group {
+  margin: 12px 0;
+}
+
+.field-group > span {
+  color: var(--slate-700);
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 7px;
+}
+
 label {
   color: var(--slate-700);
   display: grid;
@@ -120,6 +132,10 @@ label {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr 1fr;
+}
+
+.field-row label {
+  margin: 0;
 }
 
 input {
@@ -283,6 +299,7 @@ tbody tr:nth-child(even) .sticky-col {
   color: #a33a35;
 }
 
+.negative,
 .negative-cash {
   color: #c2413b;
   font-weight: 800;

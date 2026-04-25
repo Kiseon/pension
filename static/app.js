@@ -183,7 +183,6 @@ function buildBreakdownRows(months) {
     }
 
     addSummaryRow(rows, "summary:nominal", "월 총수입", "summary", "합계", month.month, month.nominal_total);
-    addSummaryRow(rows, "summary:shortfall", "목표 대비 부족액", "summary", "부족", month.month, month.target_shortfall);
     addSummaryRow(rows, "balance:cash", "현금 잔액", "balance", "잔액", month.month, month.cash_balance);
     addSummaryRow(rows, "balance:stock", "주식 잔액", "balance", "잔액", month.month, month.stock_balance);
     addSummaryRow(rows, "balance:retirement", "퇴직연금 잔액", "balance", "잔액", month.month, month.retirement_balance);
@@ -210,6 +209,9 @@ function rowClass(source) {
   if (source.kind === "summary") {
     classes.push("summary-row");
   }
+  if (source.label === "월 총수입" && Array.from(source.values.values()).some((value) => Number(value) < 0)) {
+    classes.push("negative-total");
+  }
   if (source.kind === "balance") {
     classes.push("balance-row");
   }
@@ -224,7 +226,8 @@ function rowClass(source) {
 
 function cellHtml(source, month) {
   const value = source.values.get(month) || 0;
-  const className = source.label === "현금 잔액" && Number(value) < 0 ? " class=\"negative\"" : "";
+  const isNegative = Number(value) < 0 && (source.label === "현금 잔액" || source.label === "월 총수입");
+  const className = isNegative ? " class=\"negative\"" : "";
   return `<td${className}>${formatKrw(value)}</td>`;
 }
 

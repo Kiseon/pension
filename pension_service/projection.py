@@ -182,7 +182,7 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
     retirement_balance = _initial_retirement_balance(payload)
     monthly_rows: list[dict[str, Any]] = []
     warnings: list[str] = []
-    annual_income: dict[int, Decimal] = {}
+    annual_assessable_income: dict[int, Decimal] = {}
 
     first_projection_month = months[0]
     first_year_january = Month(first_projection_month.year, 1)
@@ -197,15 +197,15 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         employment_income = _employment_income(payload, user, month, retirement_month, first_projection_month)
         _line(lines, "근로소득", employment_income, "employment")
 
-        retirement_payout = min(_retirement_payout_income(payload, user, month), max(retirement_balance, Decimal("0")))
+        retirement_payout = min(_retirement_payout_income(payload, user, month, retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= retirement_payout
         _line(lines, "퇴직금/위로금 월수령", retirement_payout, "retirement_payout")
 
-        irp_payout = min(_irp_payout(payload, month, "payout"), max(retirement_balance, Decimal("0")))
+        irp_payout = min(_irp_payout(payload, month, "payout", retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= irp_payout
         _line(lines, "본인 IRP 월수령", irp_payout, "irp_payout")
 
-        spouse_irp_payout = min(_irp_payout(payload, month, "spouse_payout"), max(retirement_balance, Decimal("0")))
+        spouse_irp_payout = min(_irp_payout(payload, month, "spouse_payout", retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= spouse_irp_payout
         _line(lines, "배우자 IRP 월수령", spouse_irp_payout, "irp_payout")
 
@@ -214,7 +214,7 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
             _line(lines, f"{_source_name(item, '부동산')} 수입", income, "real_estate_income")
             _line(lines, f"{_source_name(item, '부동산')} 비용", -expense, "real_estate_expense")
 
-        pension_lines = _pension_cashflows(payload, user, month, first_projection_month)
+        pension_lines = _pension_cashflows(payload, user, month, first_projection_month, retirement_month)
         for source, amount in pension_lines:
             _line(lines, source, amount, "pension")
 
@@ -227,7 +227,7 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         irp_contribution = _irp_contribution(payload, month, retirement_month)
         _line(lines, "IRP 납입", -irp_contribution, "irp_contribution")
 
-        health_premium = _health_insurance_premium(annual_income.get(month.year - 1, Decimal("0"))) if retirement_month.months_until(month) >= 0 else Decimal("0")
+        health_premium = _health_insurance_premium(annual_assessable_income.get(month.year - 1, Decimal("0"))) if retirement_month.months_until(month) >= 0 else Decimal("0")
         _line(lines, "건강보험료", -health_premium, "health_insurance")
 
         national_contribution = _national_pension_contribution(payload, user, month, retirement_month, lines)
@@ -237,14 +237,23 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
 
         cashflow_total = Decimal(sum(line["amount"] for line in lines))
         cash_balance += cashflow_total
+        if retirement_month.add(1).months_until(month) >= 0 and cashflow_total > 0:
+            stock_reinvestment = min(cash_balance, cashflow_total / Decimal("2"))
+            if stock_reinvestment > 0:
+                cash_balance -= stock_reinvestment
+                stock_balance += stock_reinvestment
         if cash_balance < 0 and stock_balance > 0:
             stock_drawdown = min(stock_balance, -cash_balance)
             stock_balance -= stock_drawdown
             cash_balance += stock_drawdown
 
         nominal_total = sum(line["amount"] for line in lines)
-        positive_income = sum(Decimal(line["amount"]) for line in lines if line["amount"] > 0)
-        annual_income[month.year] = annual_income.get(month.year, Decimal("0")) + positive_income
+        assessable_income = (
+            _health_assessable_income(lines)
+            if retirement_month.add(1).months_until(month) >= 0
+            else Decimal("0")
+        )
+        annual_assessable_income[month.year] = annual_assessable_income.get(month.year, Decimal("0")) + assessable_income
         months_from_value_base = first_year_january.months_until(month)
         real_total = Decimal(nominal_total) / ((Decimal("1") + monthly_growth(inflation)) ** max(months_from_value_base, 0))
         shortfall = max(target_monthly_income - Decimal(nominal_total), Decimal("0"))
@@ -295,10 +304,10 @@ def _employment_income(payload: dict[str, Any], user: Person, month: Month, reti
         return Decimal("0")
     base = money(employment.get("monthly_net_income"))
     growth = rate(employment.get("income_growth_rate"))
-    return grown_amount(base, growth, start.months_until(month))
+    return annual_step_amount(base, growth, start, month)
 
 
-def _retirement_payout_income(payload: dict[str, Any], user: Person, month: Month) -> Decimal:
+def _retirement_payout_income(payload: dict[str, Any], user: Person, month: Month, retirement_month: Month) -> Decimal:
     employment = payload.get("employment", {})
     total = money(employment.get("retirement_allowance")) + money(employment.get("voluntary_retirement_bonus"))
     if total <= 0:
@@ -311,6 +320,7 @@ def _retirement_payout_income(payload: dict[str, Any], user: Person, month: Mont
         end_age = int(employment.get("retirement_payout_end_age", start_age + 10))
         start_month = user.month_turning_age(start_age)
         end_month = user.month_turning_age(end_age).add(-1)
+    start_month = _after_retirement_start(start_month, retirement_month)
     if start_month.months_until(month) < 0 or month.months_until(end_month) < 0:
         return Decimal("0")
     payout_months = max(start_month.months_until(end_month) + 1, 1)
@@ -329,19 +339,21 @@ def _real_estate_cashflow(item: dict[str, Any], month: Month, start: Month) -> t
     return income, expense
 
 
-def _pension_cashflows(payload: dict[str, Any], user: Person, month: Month, start: Month) -> list[tuple[str, Decimal]]:
+def _pension_cashflows(payload: dict[str, Any], user: Person, month: Month, start: Month, retirement_month: Month) -> list[tuple[str, Decimal]]:
     results: list[tuple[str, Decimal]] = []
     for item in payload.get("pensions", []):
         owner_birth = item.get("owner_birth_date") or payload["household"]["user_birth_date"]
         owner = Person.parse(owner_birth)
         start_age = int(item.get("start_age", item.get("normal_start_age", 65)))
         start_month = owner.month_turning_age(start_age)
+        start_month = _after_retirement_start(start_month, retirement_month)
         if start_month.months_until(month) < 0:
             continue
         pension_type = str(item.get("type", "")).lower()
         monthly_amount = money(item.get("target_monthly_amount"))
         if pension_type in {"housing", "housing_pension", "주택연금"} and monthly_amount <= 0:
-            monthly_amount = _estimate_housing_pension(item, start_age)
+            pricing_age = _housing_pension_pricing_age(item, owner, start_month)
+            monthly_amount = _estimate_housing_pension(item, pricing_age)
         if pension_type in {"national", "국민연금", "national_pension"}:
             normal_age = int(item.get("normal_start_age") or default_national_pension_age(owner.birth_date.year))
             monthly_amount *= national_pension_factor(normal_age, start_age)
@@ -374,7 +386,7 @@ def _irp_contribution(payload: dict[str, Any], month: Month, retirement_month: M
     return money(payload.get("irp", {}).get("monthly_contribution"))
 
 
-def _irp_payout(payload: dict[str, Any], month: Month, prefix: str) -> Decimal:
+def _irp_payout(payload: dict[str, Any], month: Month, prefix: str, retirement_month: Month) -> Decimal:
     irp = payload.get("irp", {})
     start_year = int(irp.get(f"{prefix}_start_year") or 0)
     end_year = int(irp.get(f"{prefix}_end_year") or 0)
@@ -382,6 +394,7 @@ def _irp_payout(payload: dict[str, Any], month: Month, prefix: str) -> Decimal:
         return Decimal("0")
     start_month = Month(start_year, 1)
     end_month = Month(end_year, 12)
+    start_month = _after_retirement_start(start_month, retirement_month)
     if start_month.months_until(month) < 0 or month.months_until(end_month) < 0:
         return Decimal("0")
     balance_key = "current_balance" if prefix == "payout" else "spouse_current_balance"
@@ -398,6 +411,19 @@ def _health_insurance_premium(previous_year_income: Decimal) -> Decimal:
     return health * Decimal("1.1314")
 
 
+def _health_assessable_income(lines: list[dict[str, Any]]) -> Decimal:
+    total = Decimal("0")
+    pension_categories = {"pension", "retirement_payout", "irp_payout"}
+    excluded_categories = {"recommended_withdrawal"}
+    for line in lines:
+        amount = Decimal(line["amount"])
+        if amount <= 0 or line["category"] in excluded_categories:
+            continue
+        factor = Decimal("0.3") if line["category"] in pension_categories else Decimal("1")
+        total += amount * factor
+    return total
+
+
 def _national_pension_contribution(
     payload: dict[str, Any],
     user: Person,
@@ -407,7 +433,11 @@ def _national_pension_contribution(
 ) -> Decimal:
     if retirement_month.months_until(month) < 0 or user.age_on_month(month) >= 60:
         return Decimal("0")
-    positive_income = sum(Decimal(line["amount"]) for line in lines if line["amount"] > 0)
+    positive_income = sum(
+        Decimal(line["amount"])
+        for line in lines
+        if line["amount"] > 0 and line["category"] != "recommended_withdrawal"
+    )
     if positive_income <= 0:
         return Decimal("0")
     base = min(max(positive_income, Decimal("410000")), Decimal("6590000"))
@@ -418,7 +448,6 @@ def _estimate_housing_pension(item: dict[str, Any], start_age: int) -> Decimal:
     home_value = money(item.get("home_value"))
     if home_value <= 0:
         return Decimal("0")
-    ownership_share = rate(item.get("ownership_share", 1), Decimal("1"))
     # 2026 MVP approximation from HF public examples, lifetime fixed-payment type.
     age_rates = {
         60: Decimal("0.0018"),
@@ -440,8 +469,21 @@ def _estimate_housing_pension(item: dict[str, Any], start_age: int) -> Decimal:
             span = Decimal(upper - lower)
             weight = Decimal(start_age - lower) / span
             monthly_rate = age_rates[lower] + (age_rates[upper] - age_rates[lower]) * weight
-    recognized_value = min(home_value * ownership_share, Decimal("1200000000"))
+    recognized_value = min(home_value, Decimal("1200000000"))
     return recognized_value * monthly_rate
+
+
+def _housing_pension_pricing_age(item: dict[str, Any], owner: Person, start_month: Month) -> int:
+    ages = [owner.age_on_month(start_month)]
+    spouse_birth = item.get("spouse_birth_date")
+    if spouse_birth:
+        ages.append(Person.parse(spouse_birth).age_on_month(start_month))
+    return max(min(ages), 55)
+
+
+def _after_retirement_start(start_month: Month, retirement_month: Month) -> Month:
+    first_available = retirement_month.add(1)
+    return first_available if start_month.months_until(first_available) > 0 else start_month
 
 
 def _initial_cash_balance(payload: dict[str, Any]) -> Decimal:

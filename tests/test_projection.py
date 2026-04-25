@@ -91,18 +91,18 @@ class ProjectionTests(unittest.TestCase):
 
     def test_employment_income_stops_and_retirement_payout_starts(self):
         result = project(sample_payload())
-        retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
+        retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-06")
         sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
 
         self.assertNotIn("근로소득", sources)
-        self.assertEqual(sources["퇴직금/위로금 월수령"], 833_333)
+        self.assertEqual(sources["퇴직금/위로금 월수령"], 840_336)
 
     def test_health_and_national_pension_expenses_after_retirement(self):
         payload = sample_payload()
         payload["target_monthly_income"] = 0
         payload["employment"]["retirement_age"] = 58
         result = project(payload)
-        row = next(row for row in result["monthly"] if row["month"] == "2028-06")
+        row = next(row for row in result["monthly"] if row["month"] == "2029-06")
         sources = {line["source"]: line["amount"] for line in row["lines"]}
 
         self.assertIn("건강보험료", sources)
@@ -125,6 +125,22 @@ class ProjectionTests(unittest.TestCase):
 
         self.assertEqual(rent(jan), rent(dec))
         self.assertEqual(rent(next_jan), 1_344_000)
+
+    def test_employment_income_grows_annually_not_monthly(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["employment"]["income_growth_rate"] = 0.12
+        result = project(payload)
+
+        jan = next(row for row in result["monthly"] if row["month"] == "2026-01")
+        dec = next(row for row in result["monthly"] if row["month"] == "2026-12")
+        next_jan = next(row for row in result["monthly"] if row["month"] == "2027-01")
+
+        def salary(row):
+            return next(line["amount"] for line in row["lines"] if line["source"] == "근로소득")
+
+        self.assertEqual(salary(jan), salary(dec))
+        self.assertEqual(salary(next_jan), 5_600_000)
 
     def test_national_pension_timing_factor(self):
         self.assertEqual(default_national_pension_age(1970), 65)
@@ -153,6 +169,39 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(before_retirement["retirement_balance"], 5200)
         self.assertEqual(retirement_row["retirement_balance"], 5200)
         self.assertEqual(after_retirement["retirement_balance"], 5200)
+
+    def test_pension_payout_starts_after_retirement_even_if_start_age_is_earlier(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["pensions"][0]["start_age"] = 55
+        result = project(payload)
+
+        before_retirement = next(row for row in result["monthly"] if row["month"] == "2030-03")
+        after_retirement = next(row for row in result["monthly"] if row["month"] == "2030-06")
+
+        before_sources = {line["source"] for line in before_retirement["lines"]}
+        after_sources = {line["source"] for line in after_retirement["lines"]}
+
+        self.assertNotIn("국민연금", before_sources)
+        self.assertIn("국민연금", after_sources)
+
+    def test_health_insurance_counts_pension_income_at_30_percent(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["employment"]["retirement_age"] = 58
+        payload["real_estate"] = []
+        payload["financial_assets"] = []
+        payload["irp"]["current_balance"] = 0
+        payload["irp"]["monthly_contribution"] = 0
+        payload["pensions"][0]["target_monthly_amount"] = 1_000_000
+        payload["pensions"][0]["start_age"] = 58
+
+        result = project(payload)
+        row = next(row for row in result["monthly"] if row["month"] == "2029-01")
+        health = abs(next(line["amount"] for line in row["lines"] if line["source"] == "건강보험료"))
+
+        expected = round(20_160 * 1.1314)
+        self.assertEqual(health, expected)
 
     def test_recommendation_reports_shortfall_when_target_is_too_high(self):
         payload = sample_payload()
