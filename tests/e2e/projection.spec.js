@@ -35,12 +35,14 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await expect(page.locator("#summary")).toContainText("기간");
   await expect(page.locator("#summary")).toContainText("추천");
   await expect(page.locator("#summary")).toContainText("월 추가 저축 필요액");
-  await expect(page.locator("#summary")).toContainText("4,800,000원");
+  await expect(page.locator("#summary")).toContainText("4,800,000");
 
   await expect(page.locator("#projection-table")).toContainText("2026-05");
   await expect(page.locator("#projection-body")).toContainText("근로소득");
   await expect(page.locator("#projection-body")).toContainText("국민연금");
   await expect(page.locator("#projection-body")).toContainText("부동산 월수입 수입");
   await expect(page.locator("#projection-body")).toContainText("월 총수입");
-  await expect(page.locator("#projection-body tr").first()).toContainText("원");
+  const employmentRow = page.locator("#projection-body tr").filter({ hasText: "근로소득" });
+  await expect(employmentRow).toContainText("6,100,000");
+  await expect(page.locator("#projection-body")).not.toContainText("원");
 });

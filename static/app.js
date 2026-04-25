@@ -193,7 +193,7 @@ function percentValue(data, name) {
 }
 
 function formatKrw(value) {
-  return `${formatNumber(value)}원`;
+  return formatNumber(value);
 }
 
 function formatNumber(value) {
