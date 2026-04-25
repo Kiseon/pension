@@ -1,91 +1,8 @@
-<<<<<<< HEAD
-const samplePayload = {
-  household: {
-    user_birth_date: "1975-03-15",
-    spouse_birth_date: "1977-08-20"
-  },
-  start_month: "2026-04",
-  target_monthly_income: 4500000,
-  employment: {
-    currently_employed: true,
-    monthly_net_income: 5200000,
-    income_growth_rate: 0.02,
-    retirement_age: 60,
-    retirement_allowance: 120000000,
-    voluntary_retirement_bonus: 30000000
-  },
-  real_estate: [
-    {
-      name: "임대 부동산",
-      monthly_income: 1500000,
-      monthly_expense: 350000,
-      income_growth_rate: 0.02,
-      expense_growth_rate: 0.02
-    }
-  ],
-  pensions: [
-    {
-      name: "국민연금",
-      type: "national_pension",
-      target_monthly_amount: 1400000,
-      start_age: 65,
-      annual_increase_rate: 0.02
-    },
-    {
-      name: "개인연금",
-      type: "private_pension",
-      target_monthly_amount: 600000,
-      start_age: 60,
-      annual_increase_rate: 0.01
-    }
-  ],
-  financial_assets: [
-    {
-      name: "주식 투자",
-      balance: 90000000,
-      annual_return_rate: 0.05,
-      monthly_income: 0
-    },
-    {
-      name: "예금",
-      balance: 40000000,
-      annual_return_rate: 0.03,
-      monthly_income: 100000
-    }
-  ],
-  irp: {
-    current_balance: 35000000,
-    monthly_contribution: 500000,
-    annual_return_rate: 0.04
-  },
-  assumptions: {
-    inflation_rate: 0.025
-  }
-};
-
-const input = document.querySelector("#payload");
-const output = document.querySelector("#output");
-const summary = document.querySelector("#summary");
-const tableBody = document.querySelector("#monthly-table tbody");
-
-input.value = JSON.stringify(samplePayload, null, 2);
-
-document.querySelector("#run").addEventListener("click", async () => {
-  output.textContent = "계산 중...";
-  summary.innerHTML = "";
-  tableBody.innerHTML = "";
-
-  let payload;
-  try {
-    payload = JSON.parse(input.value);
-  } catch (error) {
-    output.textContent = `JSON 입력 오류: ${error.message}`;
-    return;
-  }
-=======
 const form = document.querySelector("#projection-form");
 const summary = document.querySelector("#summary");
 const tableBody = document.querySelector("#monthly-rows");
+
+initializeMoneyInputs();
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -93,7 +10,6 @@ form.addEventListener("submit", async (event) => {
   tableBody.innerHTML = "";
 
   const payload = payloadFromForm(new FormData(form));
->>>>>>> cursor/retirement-income-planning-docs-21f6
 
   try {
     const response = await fetch("/api/projections", {
@@ -107,14 +23,6 @@ form.addEventListener("submit", async (event) => {
     }
     renderResult(data);
   } catch (error) {
-<<<<<<< HEAD
-    output.textContent = `계산 실패: ${error.message}`;
-  }
-});
-
-function renderResult(data) {
-  output.textContent = JSON.stringify(data, null, 2);
-=======
     summary.innerHTML = `<div class="error">계산 실패: ${escapeHtml(error.message)}</div>`;
   }
 });
@@ -191,7 +99,6 @@ function renderResult(data) {
     return;
   }
 
->>>>>>> cursor/retirement-income-planning-docs-21f6
   summary.innerHTML = `
     <div><strong>기간</strong>: ${data.projection_start} ~ ${data.projection_end}</div>
     <div><strong>목표 월수입</strong>: ${formatKrw(data.target_monthly_income)}</div>
@@ -216,17 +123,21 @@ function renderResult(data) {
   }
 }
 
-<<<<<<< HEAD
-function formatKrw(value) {
-  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+function initializeMoneyInputs() {
+  for (const input of document.querySelectorAll('[data-format="money"]')) {
+    input.value = formatNumber(input.value);
+    input.addEventListener("blur", () => {
+      input.value = formatNumber(input.value);
+    });
+  }
 }
-=======
+
 function textValue(data, name) {
   return String(data.get(name) || "").trim();
 }
 
 function numberValue(data, name) {
-  return Number(data.get(name) || 0);
+  return Number(stripNumberFormatting(data.get(name)) || 0);
 }
 
 function percentValue(data, name) {
@@ -234,7 +145,19 @@ function percentValue(data, name) {
 }
 
 function formatKrw(value) {
-  return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+  return `${formatNumber(value)}원`;
+}
+
+function formatNumber(value) {
+  const text = stripNumberFormatting(value);
+  if (!text) {
+    return "0";
+  }
+  return Number(text).toLocaleString("ko-KR");
+}
+
+function stripNumberFormatting(value) {
+  return String(value || "").replaceAll(",", "").trim();
 }
 
 function escapeHtml(value) {
@@ -245,4 +168,3 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
->>>>>>> cursor/retirement-income-planning-docs-21f6

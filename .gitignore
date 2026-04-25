@@ -1,11 +1,6 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-<<<<<<< HEAD
-=======
 node_modules/
 test-results/
 playwright-report/
-playwright-report/
-test-results/
->>>>>>> cursor/retirement-income-planning-docs-21f6

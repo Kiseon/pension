@@ -49,6 +49,10 @@ input {
   padding: 10px 12px;
 }
 
+input[data-money] {
+  text-align: right;
+}
+
 button {
   background: #2563eb;
   border: 0;
