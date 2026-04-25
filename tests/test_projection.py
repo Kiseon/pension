@@ -19,6 +19,8 @@ def sample_payload():
             "retirement_age": 60,
             "retirement_allowance": 80_000_000,
             "voluntary_retirement_bonus": 20_000_000,
+            "retirement_payout_start_age": 60,
+            "retirement_payout_end_age": 70,
         },
         "real_estate": [
             {
@@ -50,6 +52,12 @@ def sample_payload():
             "current_balance": 50_000_000,
             "monthly_contribution": 500_000,
             "annual_return_rate": 0.03,
+            "payout_start_age": 60,
+            "payout_end_age": 80,
+        },
+        "expenses": {
+            "monthly_living_expense": 0,
+            "stock_allocation_rate": 0.5,
         },
         "assumptions": {"inflation_rate": 0.02},
     }
@@ -68,13 +76,42 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(result["projection_end"], "2070-12")
         self.assertEqual(result["monthly"][0]["user_age"], 55)
 
-    def test_employment_income_stops_and_retirement_event_is_added(self):
+    def test_employment_income_stops_and_retirement_payout_starts(self):
         result = project(sample_payload())
         retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
         sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
 
         self.assertNotIn("근로소득", sources)
-        self.assertEqual(sources["퇴직 이벤트"], 100_000_000)
+        self.assertEqual(sources["퇴직금/위로금 월수령"], 833_333)
+
+    def test_health_and_national_pension_expenses_after_retirement(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["employment"]["retirement_age"] = 58
+        result = project(payload)
+        row = next(row for row in result["monthly"] if row["month"] == "2028-06")
+        sources = {line["source"]: line["amount"] for line in row["lines"]}
+
+        self.assertIn("건강보험료", sources)
+        self.assertLess(sources["건강보험료"], 0)
+        self.assertIn("국민연금 보험료", sources)
+        self.assertLess(sources["국민연금 보험료"], 0)
+
+    def test_real_estate_income_grows_annually_not_monthly(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["real_estate"][0]["income_growth_rate"] = 0.12
+        result = project(payload)
+
+        jan = next(row for row in result["monthly"] if row["month"] == "2026-01")
+        dec = next(row for row in result["monthly"] if row["month"] == "2026-12")
+        next_jan = next(row for row in result["monthly"] if row["month"] == "2027-01")
+
+        def rent(row):
+            return next(line["amount"] for line in row["lines"] if line["source"] == "임대주택 수입")
+
+        self.assertEqual(rent(jan), rent(dec))
+        self.assertEqual(rent(next_jan), 1_344_000)
 
     def test_national_pension_timing_factor(self):
         self.assertEqual(default_national_pension_age(1970), 65)
@@ -89,6 +126,8 @@ class ProjectionTests(unittest.TestCase):
             "current_balance": 0,
             "monthly_contribution": 100,
             "annual_return_rate": 0,
+            "payout_start_age": 60,
+            "payout_end_age": 80,
         }
 
         result = project(payload)
@@ -97,8 +136,8 @@ class ProjectionTests(unittest.TestCase):
         after_retirement = next(row for row in result["monthly"] if row["month"] == "2030-06")
 
         self.assertEqual(before_retirement["remaining_financial_assets"], 5200)
-        self.assertEqual(retirement_row["remaining_financial_assets"], 100_005_200)
-        self.assertEqual(after_retirement["remaining_financial_assets"], 100_005_200)
+        self.assertEqual(retirement_row["remaining_financial_assets"], 5200)
+        self.assertEqual(after_retirement["remaining_financial_assets"], 5200)
 
     def test_recommendation_reports_shortfall_when_target_is_too_high(self):
         payload = sample_payload()

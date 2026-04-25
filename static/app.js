@@ -39,17 +39,29 @@ function payloadFromForm(data) {
       name: "국민연금",
       type: "national_pension",
       target_monthly_amount: numberValue(data, "national_pension_amount"),
+      owner_birth_date: userBirthDate,
       start_age: numberValue(data, "national_pension_start_age"),
+      annual_increase_rate: 0
+    },
+    {
+      name: "배우자 국민연금",
+      type: "national_pension",
+      target_monthly_amount: numberValue(data, "spouse_national_pension_amount"),
+      owner_birth_date: spouseBirthDate,
+      start_age: numberValue(data, "spouse_national_pension_start_age"),
       annual_increase_rate: 0
     },
     {
       name: "주택연금",
       type: "housing_pension",
-      target_monthly_amount: numberValue(data, "housing_pension_amount"),
+      target_monthly_amount: 0,
+      owner_birth_date: userBirthDate,
       start_age: numberValue(data, "housing_pension_start_age"),
+      home_value: numberValue(data, "apartment_value"),
+      ownership_share: data.get("joint_home_ownership") === "on" ? 0.5 : 1,
       annual_increase_rate: 0
     }
-  ].filter((item) => item.target_monthly_amount > 0);
+  ].filter((item) => item.owner_birth_date && (item.target_monthly_amount > 0 || item.type === "housing_pension"));
 
   return {
     household: {
@@ -64,7 +76,9 @@ function payloadFromForm(data) {
       income_growth_rate: percentValue(data, "income_growth_rate"),
       retirement_age: retirementAge,
       retirement_allowance: numberValue(data, "retirement_allowance"),
-      voluntary_retirement_bonus: numberValue(data, "voluntary_retirement_bonus")
+      voluntary_retirement_bonus: numberValue(data, "voluntary_retirement_bonus"),
+      retirement_payout_start_year: numberValue(data, "retirement_payout_start_year"),
+      retirement_payout_end_year: numberValue(data, "retirement_payout_end_year")
     },
     real_estate: [
       {
@@ -87,7 +101,22 @@ function payloadFromForm(data) {
     irp: {
       current_balance: numberValue(data, "irp_balance"),
       monthly_contribution: numberValue(data, "irp_contribution"),
+      payout_start_year: numberValue(data, "irp_payout_start_year"),
+      payout_end_year: numberValue(data, "irp_payout_end_year"),
+      spouse_current_balance: numberValue(data, "spouse_irp_balance"),
+      spouse_monthly_contribution: numberValue(data, "spouse_irp_contribution"),
+      spouse_payout_start_year: numberValue(data, "spouse_irp_payout_start_year"),
+      spouse_payout_end_year: numberValue(data, "spouse_irp_payout_end_year"),
       annual_return_rate: percentValue(data, "irp_return")
+    },
+    housing_pension: {
+      apartment_market_value: numberValue(data, "apartment_value"),
+      start_age: numberValue(data, "housing_pension_start_age"),
+      joint_ownership: data.get("joint_home_ownership") === "on"
+    },
+    expenses: {
+      monthly_living_expense: numberValue(data, "monthly_living_expense"),
+      stock_allocation_rate: percentValue(data, "stock_allocation_rate")
     },
     assumptions: {
       inflation_rate: percentValue(data, "inflation_rate")
@@ -156,6 +185,7 @@ function buildBreakdownRows(months) {
     addSummaryRow(rows, "summary:nominal", "월 총수입", "summary", "합계", month.month, month.nominal_total);
     addSummaryRow(rows, "summary:shortfall", "목표 대비 부족액", "summary", "부족", month.month, month.target_shortfall);
     addSummaryRow(rows, "summary:assets", "잔여 금융자산", "summary", "잔액", month.month, month.remaining_financial_assets);
+    addSummaryRow(rows, "summary:stock", "주식잔고", "summary", "잔액", month.month, month.stock_balance);
   }
 
   return Array.from(rows.values()).sort((left, right) => {
