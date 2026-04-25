@@ -314,8 +314,6 @@ def _apply_financial_growth(
     month: Month,
     retirement_month: Month,
 ) -> Decimal:
-    if balance <= 0:
-        return Decimal("0")
     assets = payload.get("financial_assets", [])
     weighted_return = Decimal("0")
     total_balance = Decimal("0")
@@ -329,7 +327,8 @@ def _apply_financial_growth(
     total_balance += irp_balance
     weighted_return += irp_balance * rate(irp.get("annual_return_rate"))
     annual = weighted_return / total_balance if total_balance else Decimal("0")
-    return balance * (Decimal("1") + monthly_growth(annual)) + irp_monthly
+    grown_balance = max(balance, Decimal("0")) * (Decimal("1") + monthly_growth(annual))
+    return grown_balance + irp_monthly
 
 
 def _build_recommendation(
