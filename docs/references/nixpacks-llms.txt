@@ -1,0 +1,6 @@
+Nixpacks Reference Placeholder
+==============================
+
+This file is reserved for deployment/runtime environment notes if the service
+uses Nixpacks. Keep version-specific guidance here instead of scattering it
+through implementation plans.

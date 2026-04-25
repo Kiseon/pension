@@ -1,0 +1,5 @@
+Design system reference placeholder for LLM-assisted work.
+
+Future content should include component naming, layout primitives, color tokens,
+typography rules, accessibility expectations, and examples that agents can use
+when implementing the retirement income planning interface.
