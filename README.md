@@ -17,7 +17,7 @@ IRP, 저축, 주식 투자금 등 수입 창출 수단을 입력받아 본인이
 
 ## MVP 실행
 
-이 저장소에는 외부 의존성 없이 실행되는 초기 MVP가 포함되어 있습니다.
+이 저장소에는 Python 표준 라이브러리만으로 실행되는 초기 MVP가 포함되어 있습니다.
 
 ```bash
 python3 -m pension_service.server
@@ -51,4 +51,15 @@ curl -s http://localhost:8000/api/projections \
 
 ```bash
 python3 -m unittest
+npm test
+```
+
+Playwright 기반 브라우저 검증은 실제 폼에 임의 값을 입력하고 결과 요약 및
+월별 테이블이 렌더링되는지 확인합니다. 처음 실행하는 환경에서는 브라우저가
+필요합니다.
+
+```bash
+npm install
+npx playwright install chromium --with-deps
+npm run test:e2e
 ```

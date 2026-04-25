@@ -81,6 +81,25 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(national_pension_factor(65, 60), Decimal("0.70"))
         self.assertEqual(national_pension_factor(65, 70), Decimal("1.360"))
 
+    def test_irp_contributions_stop_at_retirement_month(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["financial_assets"] = []
+        payload["irp"] = {
+            "current_balance": 0,
+            "monthly_contribution": 100,
+            "annual_return_rate": 0,
+        }
+
+        result = project(payload)
+        before_retirement = next(row for row in result["monthly"] if row["month"] == "2030-04")
+        retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
+        after_retirement = next(row for row in result["monthly"] if row["month"] == "2030-06")
+
+        self.assertEqual(before_retirement["remaining_financial_assets"], 5200)
+        self.assertEqual(retirement_row["remaining_financial_assets"], 100_005_200)
+        self.assertEqual(after_retirement["remaining_financial_assets"], 100_005_200)
+
     def test_recommendation_reports_shortfall_when_target_is_too_high(self):
         payload = sample_payload()
         payload["target_monthly_income"] = 20_000_000

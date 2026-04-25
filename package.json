@@ -1,0 +1,28 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "노후 수입 설계 서비스의 초기 기획 및 엔지니어링 문서 저장소입니다.",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests && npm run test:e2e",
+    "test:unit": "python3 -m unittest discover -s tests",
+    "test:e2e": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kiseon/pension.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/Kiseon/pension/issues"
+  },
+  "homepage": "https://github.com/Kiseon/pension#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}

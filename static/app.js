@@ -1,86 +1,13 @@
-const samplePayload = {
-  household: {
-    user_birth_date: "1975-03-15",
-    spouse_birth_date: "1977-08-20"
-  },
-  start_month: "2026-04",
-  target_monthly_income: 4500000,
-  employment: {
-    currently_employed: true,
-    monthly_net_income: 5200000,
-    income_growth_rate: 0.02,
-    retirement_age: 60,
-    retirement_allowance: 120000000,
-    voluntary_retirement_bonus: 30000000
-  },
-  real_estate: [
-    {
-      name: "임대 부동산",
-      monthly_income: 1500000,
-      monthly_expense: 350000,
-      income_growth_rate: 0.02,
-      expense_growth_rate: 0.02
-    }
-  ],
-  pensions: [
-    {
-      name: "국민연금",
-      type: "national_pension",
-      target_monthly_amount: 1400000,
-      start_age: 65,
-      annual_increase_rate: 0.02
-    },
-    {
-      name: "개인연금",
-      type: "private_pension",
-      target_monthly_amount: 600000,
-      start_age: 60,
-      annual_increase_rate: 0.01
-    }
-  ],
-  financial_assets: [
-    {
-      name: "주식 투자",
-      balance: 90000000,
-      annual_return_rate: 0.05,
-      monthly_income: 0
-    },
-    {
-      name: "예금",
-      balance: 40000000,
-      annual_return_rate: 0.03,
-      monthly_income: 100000
-    }
-  ],
-  irp: {
-    current_balance: 35000000,
-    monthly_contribution: 500000,
-    annual_return_rate: 0.04
-  },
-  assumptions: {
-    inflation_rate: 0.025
-  }
-};
-
-const input = document.querySelector("#payload");
-const output = document.querySelector("#output");
+const form = document.querySelector("#projection-form");
 const summary = document.querySelector("#summary");
-const tableBody = document.querySelector("#monthly-table tbody");
+const tableBody = document.querySelector("#monthly-rows");
 
-input.value = JSON.stringify(samplePayload, null, 2);
-
-document.querySelector("#run").addEventListener("click", async () => {
-  output.textContent = "계산 중...";
-  summary.innerHTML = "";
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  summary.textContent = "계산 중...";
   tableBody.innerHTML = "";
 
-  let payload;
-  try {
-    payload = JSON.parse(input.value);
-  } catch (error) {
-    output.textContent = `JSON 입력 오류: ${error.message}`;
-    return;
-  }
+  const payload = payloadFromForm(new FormData(form));
 
   try {
     const response = await fetch("/api/projections", {
@@ -94,12 +21,82 @@ document.querySelector("#run").addEventListener("click", async () => {
     }
     renderResult(data);
   } catch (error) {
-    output.textContent = `계산 실패: ${error.message}`;
+    summary.innerHTML = `<div class="error">계산 실패: ${escapeHtml(error.message)}</div>`;
   }
 });
 
+function payloadFromForm(data) {
+  const userBirthDate = textValue(data, "user_birth_date");
+  const spouseBirthDate = textValue(data, "spouse_birth_date");
+  const retirementAge = numberValue(data, "retirement_age");
+
+  const pensions = [
+    {
+      name: "국민연금",
+      type: "national_pension",
+      target_monthly_amount: numberValue(data, "national_pension_amount"),
+      start_age: numberValue(data, "national_pension_start_age"),
+      annual_increase_rate: 0
+    },
+    {
+      name: "주택연금",
+      type: "housing_pension",
+      target_monthly_amount: numberValue(data, "housing_pension_amount"),
+      start_age: numberValue(data, "housing_pension_start_age"),
+      annual_increase_rate: 0
+    }
+  ].filter((item) => item.target_monthly_amount > 0);
+
+  return {
+    household: {
+      user_birth_date: userBirthDate,
+      spouse_birth_date: spouseBirthDate || undefined
+    },
+    start_month: textValue(data, "start_month"),
+    target_monthly_income: numberValue(data, "target_monthly_income"),
+    employment: {
+      currently_employed: numberValue(data, "monthly_net_income") > 0,
+      monthly_net_income: numberValue(data, "monthly_net_income"),
+      income_growth_rate: percentValue(data, "income_growth_rate"),
+      retirement_age: retirementAge,
+      retirement_allowance: numberValue(data, "retirement_allowance"),
+      voluntary_retirement_bonus: numberValue(data, "voluntary_retirement_bonus")
+    },
+    real_estate: [
+      {
+        name: "부동산 월수입",
+        monthly_income: numberValue(data, "real_estate_income"),
+        monthly_expense: numberValue(data, "real_estate_expense"),
+        income_growth_rate: percentValue(data, "real_estate_growth"),
+        expense_growth_rate: percentValue(data, "real_estate_growth")
+      }
+    ],
+    pensions,
+    financial_assets: [
+      {
+        name: "주식/투자",
+        balance: numberValue(data, "stock_balance"),
+        annual_return_rate: percentValue(data, "stock_return"),
+        monthly_income: numberValue(data, "monthly_financial_income")
+      }
+    ],
+    irp: {
+      current_balance: numberValue(data, "irp_balance"),
+      monthly_contribution: numberValue(data, "irp_contribution"),
+      annual_return_rate: percentValue(data, "irp_return")
+    },
+    assumptions: {
+      inflation_rate: percentValue(data, "inflation_rate")
+    }
+  };
+}
+
 function renderResult(data) {
-  output.textContent = JSON.stringify(data, null, 2);
+  if (!data.monthly || data.monthly.length === 0) {
+    summary.innerHTML = `<div class="error">계산 결과가 비어 있습니다.</div>`;
+    return;
+  }
+
   summary.innerHTML = `
     <div><strong>기간</strong>: ${data.projection_start} ~ ${data.projection_end}</div>
     <div><strong>목표 월수입</strong>: ${formatKrw(data.target_monthly_income)}</div>
@@ -124,6 +121,27 @@ function renderResult(data) {
   }
 }
 
+function textValue(data, name) {
+  return String(data.get(name) || "").trim();
+}
+
+function numberValue(data, name) {
+  return Number(data.get(name) || 0);
+}
+
+function percentValue(data, name) {
+  return numberValue(data, name) / 100;
+}
+
 function formatKrw(value) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
