@@ -191,7 +191,11 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         investment_income = _investment_income(payload, month, first_projection_month)
         _line(lines, "배당/이자 금융수입", investment_income, "financial_income")
 
+<<<<<<< HEAD
         asset_balance = _apply_financial_growth(asset_balance, payload)
+=======
+        asset_balance = _apply_financial_growth(asset_balance, payload, month, retirement_month)
+>>>>>>> cursor/retirement-income-planning-docs-21f6
         non_withdrawal_total = Decimal(sum(line["amount"] for line in lines))
         target_gap = max(target_monthly_income - non_withdrawal_total, Decimal("0"))
         withdrawal = Decimal("0")
@@ -308,9 +312,18 @@ def _initial_financial_balance(payload: dict[str, Any]) -> Decimal:
     return total
 
 
+<<<<<<< HEAD
 def _apply_financial_growth(balance: Decimal, payload: dict[str, Any]) -> Decimal:
     if balance <= 0:
         return Decimal("0")
+=======
+def _apply_financial_growth(
+    balance: Decimal,
+    payload: dict[str, Any],
+    month: Month,
+    retirement_month: Month,
+) -> Decimal:
+>>>>>>> cursor/retirement-income-planning-docs-21f6
     assets = payload.get("financial_assets", [])
     weighted_return = Decimal("0")
     total_balance = Decimal("0")
@@ -320,11 +333,20 @@ def _apply_financial_growth(balance: Decimal, payload: dict[str, Any]) -> Decima
         weighted_return += item_balance * rate(item.get("annual_return_rate"))
     irp = payload.get("irp", {})
     irp_balance = money(irp.get("current_balance"))
+<<<<<<< HEAD
     irp_monthly = money(irp.get("monthly_contribution"))
     total_balance += irp_balance
     weighted_return += irp_balance * rate(irp.get("annual_return_rate"))
     annual = weighted_return / total_balance if total_balance else Decimal("0")
     return balance * (Decimal("1") + monthly_growth(annual)) + irp_monthly
+=======
+    irp_monthly = money(irp.get("monthly_contribution")) if retirement_month.months_until(month) < 0 else Decimal("0")
+    total_balance += irp_balance
+    weighted_return += irp_balance * rate(irp.get("annual_return_rate"))
+    annual = weighted_return / total_balance if total_balance else Decimal("0")
+    grown_balance = max(balance, Decimal("0")) * (Decimal("1") + monthly_growth(annual))
+    return grown_balance + irp_monthly
+>>>>>>> cursor/retirement-income-planning-docs-21f6
 
 
 def _build_recommendation(
