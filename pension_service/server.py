@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -79,5 +80,13 @@ def run(host: str = "127.0.0.1", port: int = 8000) -> None:
     server.serve_forever()
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the Pension MVP HTTP server.")
+    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
+    args = parser.parse_args()
+    run(args.host, args.port)
+
+
 if __name__ == "__main__":
-    run()
+    main()

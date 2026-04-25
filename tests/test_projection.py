@@ -1,11 +1,7 @@
+import unittest
 from decimal import Decimal
 
-from pension_service.projection import (
-    Month,
-    default_national_pension_age,
-    national_pension_factor,
-    project,
-)
+from pension_service.projection import Month, default_national_pension_age, national_pension_factor, project
 
 
 def sample_payload():
@@ -59,46 +55,47 @@ def sample_payload():
     }
 
 
-def test_projection_runs_to_age_100_when_assets_do_not_deplete_early():
-    payload = sample_payload()
-    payload["target_monthly_income"] = 0
+class ProjectionTests(unittest.TestCase):
+    def test_projection_runs_to_age_100_when_assets_do_not_deplete_early(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
 
-    result = project(payload)
+        result = project(payload)
 
-    assert result["market"] == "KR"
-    assert result["currency"] == "KRW"
-    assert result["projection_start"] == "2026-01"
-    assert result["projection_end"] == "2070-12"
-    assert result["monthly"][0]["user_age"] == 55
+        self.assertEqual(result["market"], "KR")
+        self.assertEqual(result["currency"], "KRW")
+        self.assertEqual(result["projection_start"], "2026-01")
+        self.assertEqual(result["projection_end"], "2070-12")
+        self.assertEqual(result["monthly"][0]["user_age"], 55)
+
+    def test_employment_income_stops_and_retirement_event_is_added(self):
+        result = project(sample_payload())
+        retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
+        sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
+
+        self.assertNotIn("근로소득", sources)
+        self.assertEqual(sources["퇴직 이벤트"], 100_000_000)
+
+    def test_national_pension_timing_factor(self):
+        self.assertEqual(default_national_pension_age(1970), 65)
+        self.assertEqual(national_pension_factor(65, 60), Decimal("0.70"))
+        self.assertEqual(national_pension_factor(65, 70), Decimal("1.360"))
+
+    def test_recommendation_reports_shortfall_when_target_is_too_high(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 20_000_000
+        payload["financial_assets"][0]["balance"] = 1_000_000
+        payload["irp"]["current_balance"] = 0
+        payload["irp"]["monthly_contribution"] = 0
+
+        result = project(payload)
+
+        self.assertGreater(result["recommendation"]["additional_savings_needed_at_retirement"], 0)
+        self.assertIsNotNone(result["recommendation"]["depletion_month"])
+
+    def test_month_ordering_helper(self):
+        self.assertEqual(Month.parse("2026-01").months_until(Month.parse("2027-01")), 12)
 
 
-def test_employment_income_stops_and_retirement_event_is_added():
-    result = project(sample_payload())
-    retirement_row = next(row for row in result["monthly"] if row["month"] == "2030-05")
-    sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
-
-    assert "근로소득" not in sources
-    assert sources["퇴직 이벤트"] == 100_000_000
-
-
-def test_national_pension_timing_factor():
-    assert default_national_pension_age(1970) == 65
-    assert national_pension_factor(65, 60) == Decimal("0.70")
-    assert national_pension_factor(65, 70) == Decimal("1.360")
-
-
-def test_recommendation_reports_shortfall_when_target_is_too_high():
-    payload = sample_payload()
-    payload["target_monthly_income"] = 20_000_000
-    payload["financial_assets"][0]["balance"] = 1_000_000
-    payload["irp"]["current_balance"] = 0
-    payload["irp"]["monthly_contribution"] = 0
-
-    result = project(payload)
-
-    assert result["recommendation"]["additional_savings_needed_at_retirement"] > 0
-    assert result["recommendation"]["depletion_month"] is not None
-
-
-def test_month_ordering_helper():
-    assert Month.parse("2026-01").months_until(Month.parse("2027-01")) == 12
+if __name__ == "__main__":
+    unittest.main()
