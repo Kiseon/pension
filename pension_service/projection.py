@@ -22,13 +22,9 @@ NATIONAL_PENSION_RATE = Decimal("0.095")
 NATIONAL_PENSION_MIN_BASE = Decimal("410000")
 NATIONAL_PENSION_MAX_BASE = Decimal("6590000")
 STOCK_ALLOCATION_RATE = Decimal("0.5")
-# 임대(상가 등) 간이경비율 — 세법 개정 시 assumptions / real_estate item에서 덮어쓸 수 있음
-DEFAULT_REAL_ESTATE_EXPENSE_RATIO = Decimal("0.415")
-# 연금소득 분리과세 세율(연금계좌 등, MVP 단순화)
-IRP_SEPARATE_TAX_RATE = Decimal("0.03")
-# 합산과세 시 연금소득 과세표준 포함 비율(이연·연금 수령 일반례 단순화)
-IRP_AMALGAMATION_TAXABLE_FRACTION = Decimal("0.70")
-# 종합소득세 과세표준 누진(2026 귀속 근사치, 단위: 원) — 법령 개정 시 rule_versions와 함께 갱신
+# 임대소득 간이경비율(고정) — 세법 개정 시 상수만 갱신
+REAL_ESTATE_SIMPLE_EXPENSE_RATIO = Decimal("0.415")
+# 종합소득 과세표준 누진(2026 귀속 근사치, 한계세율 산출용) — 법령 개정 시 rule_versions와 함께 갱신
 _COMPOSITE_TAX_BRACKETS: list[tuple[Decimal | None, Decimal, Decimal]] = [
     (Decimal("14000000"), Decimal("0.06"), Decimal("0")),
     (Decimal("50000000"), Decimal("0.15"), Decimal("1260000")),
@@ -207,9 +203,6 @@ def _compute_monthly_rows(
     retirement_return = _retirement_return(payload)
     monthly_rows: list[dict[str, Any]] = []
     annual_assessable_income: dict[int, Decimal] = {}
-    # 상가 단독명의 가정: 본인 근로·임대·국민연금·본인 IRP만 종합소득세 과세소득에 포함
-    tax_aggregate: dict[int, dict[str, Decimal]] = {}
-    composite_tax_paid_ytd: dict[int, Decimal] = {}
 
     first_projection_month = months[0]
     first_year_january = Month(first_projection_month.year, 1)
@@ -242,13 +235,6 @@ def _compute_monthly_rows(
         retirement_irp_income = retirement_payout + irp_payout + spouse_irp_payout
         _line(lines, "퇴직연금/IRP 월수령", retirement_irp_income, "retirement_irp_payout")
 
-        rental_net_for_tax = Decimal("0")
-        for item in payload.get("real_estate", []):
-            income, expense = _real_estate_cashflow(item, month, first_projection_month)
-            _line(lines, f"{_source_name(item, '부동산')} 수입", income, "real_estate_income")
-            _line(lines, f"{_source_name(item, '부동산')} 비용", -expense, "real_estate_expense")
-            rental_net_for_tax += _real_estate_net_for_composite_tax(item, month, first_projection_month)
-
         pension_lines = _pension_cashflows(
             payload, user, spouse, month, first_projection_month, retirement_month, inflation
         )
@@ -258,14 +244,23 @@ def _compute_monthly_rows(
         user_national_pension = _user_national_pension_monthly(
             payload, user, spouse, month, first_projection_month, retirement_month, inflation
         )
-        ykey = month.year
-        bucket = tax_aggregate.setdefault(
-            ykey, {"employment": Decimal("0"), "rental": Decimal("0"), "pension": Decimal("0"), "irp": Decimal("0")}
+
+        rental_netish_total = Decimal("0")
+        for item in payload.get("real_estate", []):
+            rental_netish_total += _real_estate_monthly_gross(item, month, first_projection_month) * (
+                Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO
+            )
+        taxable_for_marginal = (
+            employment_income + user_national_pension + irp_payout + retirement_payout + rental_netish_total
         )
-        bucket["employment"] += employment_income
-        bucket["rental"] += rental_net_for_tax
-        bucket["pension"] += user_national_pension
-        bucket["irp"] += irp_payout + retirement_payout
+        marginal_rate = _marginal_income_tax_rate(taxable_for_marginal)
+
+        for item in payload.get("real_estate", []):
+            income, expense = _real_estate_income_and_tax_expense(
+                item, month, first_projection_month, marginal_rate
+            )
+            _line(lines, f"{_source_name(item, '부동산')} 수입", income, "real_estate_income")
+            _line(lines, f"{_source_name(item, '부동산')} 비용", -expense, "real_estate_expense")
 
         investment_income = _investment_income(payload, month, first_projection_month)
         _line(lines, "배당/이자 금융수입", investment_income, "financial_income")
@@ -283,16 +278,6 @@ def _compute_monthly_rows(
 
         national_contribution = _national_pension_contribution(payload, user, month, retirement_month, lines)
         _line(lines, "국민연금 납입", -national_contribution, "national_pension_contribution")
-
-        if month.month == 12:
-            agg = tax_aggregate[ykey]
-            _mode_used, annual_tax = _annual_composite_tax_with_irp(
-                payload, agg["employment"], agg["rental"], agg["pension"], agg["irp"]
-            )
-            paid_before = composite_tax_paid_ytd.get(ykey, Decimal("0"))
-            december_installment = annual_tax - paid_before
-            composite_tax_paid_ytd[ykey] = annual_tax
-            _line(lines, "종합소득세(연납)", -december_installment, "composite_income_tax")
 
         irp_user_balance += irp_contribution
         irp_spouse_balance += spouse_irp_contribution
@@ -366,7 +351,7 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
             "housing_pension": "kr-hf-table-estimate-mvp-2026-04",
             "health_insurance": "kr-nhis-income-mvp-2026-04",
             "tax": "kr-tax-user-monthly-cost-mvp-2026-04",
-            "composite_income_tax": "kr-composite-simplified-mvp-2026-04",
+            "real_estate_income_tax": "kr-rental-net-times-marginal-rate-mvp-2026-04",
         },
     }
 
@@ -407,16 +392,18 @@ def _retirement_lump_sum(payload: dict[str, Any]) -> Decimal:
     return money(employment.get("retirement_allowance")) + money(employment.get("voluntary_retirement_bonus"))
 
 
-def _real_estate_cashflow(item: dict[str, Any], month: Month, start: Month) -> tuple[Decimal, Decimal]:
-    years = max(month.year - start.year, 0)
-    income = money(item.get("monthly_income")) * ((Decimal("1") + rate(item.get("income_growth_rate"))) ** years)
-    ratio = money(item.get("expense_ratio"), DEFAULT_REAL_ESTATE_EXPENSE_RATIO)
-    if ratio > Decimal("1"):
-        ratio = ratio / Decimal("100")
-    ratio = min(max(ratio, Decimal("0")), Decimal("1"))
-    simple = income * ratio
-    explicit = money(item.get("monthly_expense")) * ((Decimal("1") + rate(item.get("expense_growth_rate"))) ** years)
-    return income, simple + explicit
+def _real_estate_income_and_tax_expense(
+    item: dict[str, Any],
+    month: Month,
+    start: Month,
+    marginal_income_tax_rate: Decimal,
+) -> tuple[Decimal, Decimal]:
+    """수입 = 월 임대총액, 비용(세금) = (수입 − 수입×41.5%) × 한계 소득세율."""
+
+    gross = _real_estate_monthly_gross(item, month, start)
+    netish = gross * (Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO)
+    tax_expense = netish * marginal_income_tax_rate if netish > 0 else Decimal("0")
+    return gross, tax_expense
 
 
 def _pension_line_amount(
@@ -491,59 +478,36 @@ def _user_national_pension_monthly(
     return total
 
 
-def _composite_income_tax_on_standard(taxable: Decimal) -> Decimal:
+def _marginal_income_tax_rate(taxable: Decimal) -> Decimal:
+    """과세표준 구간의 한계세율(MVP: 2026 귀속 근사 누진표)."""
+
     if taxable <= 0:
         return Decimal("0")
-    for ceiling, rate, deduction in _COMPOSITE_TAX_BRACKETS:
+    for ceiling, rate, _deduction in _COMPOSITE_TAX_BRACKETS:
         if ceiling is None or taxable <= ceiling:
-            return max(taxable * rate - deduction, Decimal("0"))
-    return Decimal("0")
+            return rate
+    return _COMPOSITE_TAX_BRACKETS[-1][1]
 
 
-def _real_estate_net_for_composite_tax(item: dict[str, Any], month: Month, start: Month) -> Decimal:
-    """상가 등 단독명의: 총수입 − 간이경비(기본 41.5%) − 명시된 추가 경비."""
-
+def _real_estate_monthly_gross(item: dict[str, Any], month: Month, start: Month) -> Decimal:
     years = max(month.year - start.year, 0)
-    gross = money(item.get("monthly_income")) * ((Decimal("1") + rate(item.get("income_growth_rate"))) ** years)
-    ratio = money(item.get("expense_ratio"), DEFAULT_REAL_ESTATE_EXPENSE_RATIO)
-    if ratio > Decimal("1"):
-        ratio = ratio / Decimal("100")
-    ratio = min(max(ratio, Decimal("0")), Decimal("1"))
-    simple_deduction = gross * ratio
-    explicit = money(item.get("monthly_expense")) * ((Decimal("1") + rate(item.get("expense_growth_rate"))) ** years)
-    return gross - simple_deduction - explicit
+    return money(item.get("monthly_income")) * ((Decimal("1") + rate(item.get("income_growth_rate"))) ** years)
 
 
-def _irp_tax_mode(payload: dict[str, Any]) -> str:
-    mode = str(payload.get("assumptions", {}).get("irp_income_tax_mode", "auto")).lower()
-    if mode in {"separate", "분리"}:
-        return "separate"
-    if mode in {"amalgamation", "합산"}:
-        return "amalgamation"
-    return "auto"
+def _real_estate_income_tax_expense_monthly(
+    item: dict[str, Any],
+    month: Month,
+    start: Month,
+    taxable_base_before_rental: Decimal,
+) -> Decimal:
+    """부동산 월 '비용' = (월수입 − 월수입×간이경비율) × 한계 소득세율. 상가 단독명의·본인 소득만."""
 
-
-def _annual_composite_tax_with_irp(
-    payload: dict[str, Any],
-    employment_ytd: Decimal,
-    rental_ytd: Decimal,
-    pension_ytd: Decimal,
-    irp_ytd: Decimal,
-) -> tuple[str, Decimal]:
-    """연간(1~12월 합) 종합소득세. IRP는 합산(과세표준 70%) vs 분리(3%) 중 유리한 쪽(auto)."""
-
-    mode = _irp_tax_mode(payload)
-    tax_sep = _composite_income_tax_on_standard(employment_ytd + rental_ytd + pension_ytd) + irp_ytd * IRP_SEPARATE_TAX_RATE
-    tax_amalg = _composite_income_tax_on_standard(
-        employment_ytd + rental_ytd + pension_ytd + irp_ytd * IRP_AMALGAMATION_TAXABLE_FRACTION
-    )
-    if mode == "separate":
-        return "separate", tax_sep
-    if mode == "amalgamation":
-        return "amalgamation", tax_amalg
-    if tax_sep <= tax_amalg:
-        return "separate", tax_sep
-    return "amalgamation", tax_amalg
+    gross = _real_estate_monthly_gross(item, month, start)
+    netish = gross * (Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO)
+    if netish <= 0:
+        return Decimal("0")
+    marginal = _marginal_income_tax_rate(taxable_base_before_rental)
+    return netish * marginal
 
 
 def _investment_income(payload: dict[str, Any], month: Month, start: Month) -> Decimal:

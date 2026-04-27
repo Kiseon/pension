@@ -16,10 +16,7 @@
     {
       "name": "임대 부동산",
       "monthly_income": 1500000,
-      "monthly_expense": 0,
-      "expense_ratio": 0.415,
-      "income_growth_rate": 0.02,
-      "expense_growth_rate": 0.02
+      "income_growth_rate": 0.02
     }
   ],
   "pensions": [

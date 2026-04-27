@@ -73,32 +73,17 @@
 
           <h2>부동산 월수입</h2>
           <p class="field-hint">
-            비용란에는 간이경비(기본 41.5%) 외 추가 경비만 입력합니다. 종합소득세는 매년 12월에
-            근로·임대(상가 본인)·국민연금·IRP를 반영해 자동 산출됩니다.
+            상가 등 본인 단독명의 가정입니다. 월 비용은 (월수입 − 월수입×41.5%)에 해당 연도
+            근로·국민연금·본인 IRP/퇴직 분할 수령과 합산한 과세표준 구간의 한계 소득세율을 곱한
+            추정 종합소득세입니다.
           </p>
           <label>
             월 임대/사업 수입
             <input name="real_estate_income" type="text" inputmode="numeric" value="1,300,000" data-format="money" />
           </label>
           <label>
-            월 추가 경비(간이경비 제외)
-            <input name="real_estate_expense" type="text" inputmode="numeric" value="0" data-format="money" />
-          </label>
-          <label>
-            임대 간이경비율(%)
-            <input name="real_estate_expense_ratio" type="number" value="41.5" min="0" max="100" step="0.1" />
-          </label>
-          <label>
             부동산 수입 연 상승률(%)
             <input name="real_estate_growth" type="number" value="1.5" step="0.1" />
-          </label>
-          <label>
-            IRP 연금소득 세금 처리
-            <select name="irp_income_tax_mode">
-              <option value="auto" selected>자동(합산 vs 분리 중 유리)</option>
-              <option value="amalgamation">합산과세</option>
-              <option value="separate">분리과세(3%)</option>
-            </select>
           </label>
 
           <h2>연금</h2>

@@ -84,10 +84,7 @@ function payloadFromForm(data) {
       {
         name: "부동산 월수입",
         monthly_income: numberValue(data, "real_estate_income"),
-        monthly_expense: numberValue(data, "real_estate_expense"),
-        expense_ratio: percentValue(data, "real_estate_expense_ratio"),
-        income_growth_rate: percentValue(data, "real_estate_growth"),
-        expense_growth_rate: percentValue(data, "real_estate_growth")
+        income_growth_rate: percentValue(data, "real_estate_growth")
       }
     ],
     pensions,
@@ -120,8 +117,7 @@ function payloadFromForm(data) {
       stock_allocation_rate: percentValue(data, "stock_allocation_rate")
     },
     assumptions: {
-      inflation_rate: percentValue(data, "inflation_rate"),
-      irp_income_tax_mode: textValue(data, "irp_income_tax_mode") || "auto"
+      inflation_rate: percentValue(data, "inflation_rate")
     }
   };
 }

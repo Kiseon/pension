@@ -15,7 +15,6 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await page.getByLabel("퇴직금/위로금 수령 시작 연도").fill("2034");
   await page.getByLabel("퇴직금/위로금 수령 종료 연도").fill("2055");
   await page.getByLabel("월 임대/사업 수입").fill("1,600,000");
-  await page.getByLabel("월 추가 경비(간이경비 제외)").fill("0");
   await page.getByLabel("부동산 수입 연 상승률(%)").fill("1.8");
   await page.locator('[name="national_pension_amount"]').fill("1,550,000");
   await page.locator('[name="national_pension_start_age"]').fill("65");
