@@ -251,6 +251,36 @@ class ProjectionTests(unittest.TestCase):
         self.assertGreater(row["stock_balance"], 0)
         self.assertGreater(row["cash_balance"], row["stock_balance"])
 
+    def test_real_estate_expense_includes_simple_cost_ratio(self):
+        payload = sample_payload()
+        payload["real_estate"] = [
+            {
+                "name": "상가",
+                "monthly_income": 1_000_000,
+                "monthly_expense": 0,
+                "expense_ratio": 0.415,
+                "income_growth_rate": 0,
+                "expense_growth_rate": 0,
+            }
+        ]
+        result = project(payload)
+        row = result["monthly"][0]
+        expense = abs(next(line["amount"] for line in row["lines"] if "비용" in line["source"]))
+        self.assertEqual(expense, 415_000)
+
+    def test_december_has_composite_income_tax_line(self):
+        payload = sample_payload()
+        payload["start_month"] = "2026-01"
+        payload["employment"]["monthly_net_income"] = 8_000_000
+        payload["real_estate"][0]["monthly_income"] = 2_000_000
+        payload["real_estate"][0]["monthly_expense"] = 0
+        payload["real_estate"][0]["expense_ratio"] = 0.415
+        payload["assumptions"]["irp_income_tax_mode"] = "amalgamation"
+        result = project(payload)
+        dec = next(r for r in result["monthly"] if r["month"] == "2026-12")
+        sources = {line["source"] for line in dec["lines"]}
+        self.assertIn("종합소득세(연납)", sources)
+
     def test_real_estate_income_grows_annually_not_monthly(self):
         payload = sample_payload()
         payload["real_estate"][0]["income_growth_rate"] = 0.12

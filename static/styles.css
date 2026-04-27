@@ -109,6 +109,13 @@ body {
   padding-top: 0;
 }
 
+.field-hint {
+  color: var(--slate-500);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
 .field-group {
   margin: 12px 0;
 }
