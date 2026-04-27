@@ -51,6 +51,10 @@
             <input name="monthly_net_income" type="text" inputmode="numeric" value="5,200,000" data-format="money" />
           </label>
           <label>
+            세전 월 근로소득(누진세 구간용, 선택)
+            <input name="monthly_gross_income_for_tax" type="text" inputmode="numeric" value="" data-format="money" placeholder="미입력 시 세후×1.31 근사" />
+          </label>
+          <label>
             근로소득 연 상승률(%)
             <input name="income_growth_rate" type="number" value="2" step="0.1" />
           </label>
@@ -73,9 +77,9 @@
 
           <h2>부동산 월수입</h2>
           <p class="field-hint">
-            상가 등 본인 단독명의 가정입니다. 월 비용은 (월수입 − 월수입×41.5%)에 해당 연도
-            근로·국민연금·본인 IRP/퇴직 분할 수령과 합산한 과세표준 구간의 한계 소득세율을 곱한
-            추정 종합소득세입니다.
+            상가 등 본인 단독명의 가정입니다. 월 비용 ≈ (월수입 − 월수입×41.5%) × (국세 한계세율 + 지방 10%).
+            한계세율은 연간 과세표준 근사(당월 월액×12)로 구하며,             재직 중(퇴직 전)에는 IRP·퇴직분할 수령은
+            구간 산정에서 제외합니다. 세전 근로는 선택 입력, 없으면 세후×1.31 근사입니다.
           </p>
           <label>
             월 임대/사업 수입

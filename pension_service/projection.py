@@ -24,7 +24,11 @@ NATIONAL_PENSION_MAX_BASE = Decimal("6590000")
 STOCK_ALLOCATION_RATE = Decimal("0.5")
 # 임대소득 간이경비율(고정) — 세법 개정 시 상수만 갱신
 REAL_ESTATE_SIMPLE_EXPENSE_RATIO = Decimal("0.415")
-# 종합소득 과세표준 누진(2026 귀속 근사치, 한계세율 산출용) — 법령 개정 시 rule_versions와 함께 갱신
+# 지방소득세: 국세 산출세액의 10% (한계에 동일 비율 적용 MVP)
+LOCAL_INCOME_TAX_ON_NATIONAL = Decimal("0.10")
+# 월 세후 근로 → 세전 과세소득 근사(입력 없을 때). 650만 세후 ≈ 850만+ 세전 가정
+DEFAULT_NET_TO_GROSS_EMPLOYMENT_FACTOR = Decimal("1.31")
+# 종합소득 과세표준 누진(2026 귀속 근사치, 단위: 연간 원) — 한계세율 산출용
 _COMPOSITE_TAX_BRACKETS: list[tuple[Decimal | None, Decimal, Decimal]] = [
     (Decimal("14000000"), Decimal("0.06"), Decimal("0")),
     (Decimal("50000000"), Decimal("0.15"), Decimal("1260000")),
@@ -250,14 +254,24 @@ def _compute_monthly_rows(
             rental_netish_total += _real_estate_monthly_gross(item, month, first_projection_month) * (
                 Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO
             )
-        taxable_for_marginal = (
-            employment_income + user_national_pension + irp_payout + retirement_payout + rental_netish_total
+        # 누진 구간은 연간 과세표준 기준: 당월 월액 합을 연환산(MVP). 재직 중엔 IRP·퇴직분할 제외.
+        emp_gross_for_bracket = _employment_gross_for_tax_bracket(
+            payload, user, month, retirement_month, first_projection_month
         )
-        marginal_rate = _marginal_income_tax_rate(taxable_for_marginal)
+        if retirement_month.months_until(month) < 0:
+            # 재직 중(퇴직월 전): IRP·퇴직 분할 수령은 누진 구간 산정에서 제외
+            taxable_monthly_core = emp_gross_for_bracket + user_national_pension + rental_netish_total
+        else:
+            # 퇴직월 이후: 국민연금·퇴직/IRP 수령·임대 순액 합산(MVP: 연금 분리과세는 월액 그대로 반영)
+            taxable_monthly_core = (
+                user_national_pension + retirement_payout + irp_payout + rental_netish_total
+            )
+        taxable_annual_approx = taxable_monthly_core * Decimal("12")
+        marginal_combined = _marginal_combined_income_tax_rate(taxable_annual_approx)
 
         for item in payload.get("real_estate", []):
             income, expense = _real_estate_income_and_tax_expense(
-                item, month, first_projection_month, marginal_rate
+                item, month, first_projection_month, marginal_combined
             )
             _line(lines, f"{_source_name(item, '부동산')} 수입", income, "real_estate_income")
             _line(lines, f"{_source_name(item, '부동산')} 비용", -expense, "real_estate_expense")
@@ -351,7 +365,7 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
             "housing_pension": "kr-hf-table-estimate-mvp-2026-04",
             "health_insurance": "kr-nhis-income-mvp-2026-04",
             "tax": "kr-tax-user-monthly-cost-mvp-2026-04",
-            "real_estate_income_tax": "kr-rental-net-times-marginal-rate-mvp-2026-04",
+            "real_estate_income_tax": "kr-rental-net-annual-bracket-marginal-x1.1-mvp-2026-04",
         },
     }
 
@@ -396,13 +410,13 @@ def _real_estate_income_and_tax_expense(
     item: dict[str, Any],
     month: Month,
     start: Month,
-    marginal_income_tax_rate: Decimal,
+    marginal_combined_rate: Decimal,
 ) -> tuple[Decimal, Decimal]:
-    """수입 = 월 임대총액, 비용(세금) = (수입 − 수입×41.5%) × 한계 소득세율."""
+    """수입 = 월 임대총액, 비용(세금) ≈ (수입 − 수입×41.5%) × (국세+지방세 한계)."""
 
     gross = _real_estate_monthly_gross(item, month, start)
     netish = gross * (Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO)
-    tax_expense = netish * marginal_income_tax_rate if netish > 0 else Decimal("0")
+    tax_expense = netish * marginal_combined_rate if netish > 0 else Decimal("0")
     return gross, tax_expense
 
 
@@ -478,36 +492,53 @@ def _user_national_pension_monthly(
     return total
 
 
-def _marginal_income_tax_rate(taxable: Decimal) -> Decimal:
-    """과세표준 구간의 한계세율(MVP: 2026 귀속 근사 누진표)."""
+def _marginal_national_income_tax_rate(annual_taxable: Decimal) -> Decimal:
+    """연간 과세표준 구간의 국세 한계세율(MVP: 2026 귀속 근사 누진표, 단위: 원/년)."""
 
-    if taxable <= 0:
+    if annual_taxable <= 0:
         return Decimal("0")
     for ceiling, rate, _deduction in _COMPOSITE_TAX_BRACKETS:
-        if ceiling is None or taxable <= ceiling:
+        if ceiling is None or annual_taxable <= ceiling:
             return rate
     return _COMPOSITE_TAX_BRACKETS[-1][1]
+
+
+def _marginal_combined_income_tax_rate(annual_taxable: Decimal) -> Decimal:
+    """국세 한계세율 × (1+지방소득세율). 예: 35% → 38.5%."""
+
+    return _marginal_national_income_tax_rate(annual_taxable) * (Decimal("1") + LOCAL_INCOME_TAX_ON_NATIONAL)
+
+
+def _employment_gross_for_tax_bracket(
+    payload: dict[str, Any],
+    user: Person,
+    month: Month,
+    retirement_month: Month,
+    start: Month,
+) -> Decimal:
+    """과세표준 누진용 근로소득(세전 월액 근사). `monthly_gross_income_for_tax` 있으면 사용, 없으면 세후×환산."""
+
+    employment = payload.get("employment", {})
+    if not employment.get("currently_employed", False):
+        return Decimal("0")
+    if retirement_month.months_until(month) >= 0:
+        return Decimal("0")
+    explicit = money(employment.get("monthly_gross_income_for_tax"))
+    if explicit > 0:
+        base = explicit
+    else:
+        net = money(employment.get("monthly_net_income"))
+        factor = money(employment.get("net_to_gross_factor"), DEFAULT_NET_TO_GROSS_EMPLOYMENT_FACTOR)
+        if factor < Decimal("1"):
+            factor = DEFAULT_NET_TO_GROSS_EMPLOYMENT_FACTOR
+        base = net * factor
+    growth = rate(employment.get("income_growth_rate"))
+    return annual_step_amount(base, growth, start, month)
 
 
 def _real_estate_monthly_gross(item: dict[str, Any], month: Month, start: Month) -> Decimal:
     years = max(month.year - start.year, 0)
     return money(item.get("monthly_income")) * ((Decimal("1") + rate(item.get("income_growth_rate"))) ** years)
-
-
-def _real_estate_income_tax_expense_monthly(
-    item: dict[str, Any],
-    month: Month,
-    start: Month,
-    taxable_base_before_rental: Decimal,
-) -> Decimal:
-    """부동산 월 '비용' = (월수입 − 월수입×간이경비율) × 한계 소득세율. 상가 단독명의·본인 소득만."""
-
-    gross = _real_estate_monthly_gross(item, month, start)
-    netish = gross * (Decimal("1") - REAL_ESTATE_SIMPLE_EXPENSE_RATIO)
-    if netish <= 0:
-        return Decimal("0")
-    marginal = _marginal_income_tax_rate(taxable_base_before_rental)
-    return netish * marginal
 
 
 def _investment_income(payload: dict[str, Any], month: Month, start: Month) -> Decimal:

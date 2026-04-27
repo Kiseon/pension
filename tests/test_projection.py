@@ -1,5 +1,5 @@
 import unittest
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from pension_service.projection import Month, default_national_pension_age, national_pension_factor, project
 
@@ -251,26 +251,44 @@ class ProjectionTests(unittest.TestCase):
         self.assertGreater(row["stock_balance"], 0)
         self.assertGreater(row["cash_balance"], row["stock_balance"])
 
-    def test_real_estate_expense_is_netish_times_marginal_rate(self):
-        """비용 = (월수입 − 월수입×0.415) × 한계 소득세율."""
+    def test_real_estate_expense_uses_annual_bracket_and_local_surtax(self):
+        """연환산 과세표준으로 한계세율; 국세+지방(×1.1). 재직 중 IRP·퇴직분할은 구간 산정 제외."""
 
-        payload = sample_payload()
-        payload["real_estate"] = [
-            {
-                "name": "상가",
-                "monthly_income": 1_000_000,
+        payload = {
+            "start_month": "2026-01",
+            "household": {"user_birth_date": "1975-01-01"},
+            "employment": {
+                "currently_employed": True,
+                "monthly_net_income": 0,
+                "monthly_gross_income_for_tax": 9_240_000,
                 "income_growth_rate": 0,
-            }
-        ]
+                "retirement_age": 65,
+                "retirement_allowance": 0,
+                "voluntary_retirement_bonus": 0,
+            },
+            "real_estate": [
+                {"name": "상가", "monthly_income": 1_300_000, "income_growth_rate": 0},
+            ],
+            "pensions": [],
+            "financial_assets": [],
+            "irp": {
+                "current_balance": 50_000_000,
+                "monthly_contribution": 0,
+                "annual_return_rate": 0,
+                "payout_start_year": 2100,
+                "payout_end_year": 2100,
+            },
+            "expenses": {"monthly_living_expense": 0, "stock_allocation_rate": 0.5},
+            "assumptions": {"inflation_rate": 0},
+        }
         result = project(payload)
         row = result["monthly"][0]
         expense = abs(next(line["amount"] for line in row["lines"] if "비용" in line["source"]))
-        netish = 1_000_000 * (1 - 0.415)
-        employment = 5_000_000
-        taxable = employment + netish
-        self.assertLess(taxable, 14_000_000)
-        expected = round(netish * 0.06)
+        netish = Decimal("1300000") * (Decimal("1") - Decimal("0.415"))
+        # 월 (924만 + 76.05만) × 12 ≈ 1.2억 → 한계 국세 35%, ×1.1 = 38.5%
+        expected = int((netish * Decimal("0.35") * Decimal("1.1")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         self.assertEqual(expense, expected)
+        self.assertAlmostEqual(float(expense), 1300000 * 0.585 * 0.385, delta=1)
 
     def test_no_annual_composite_tax_line(self):
         payload = sample_payload()

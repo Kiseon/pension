@@ -73,6 +73,7 @@ function payloadFromForm(data) {
     employment: {
       currently_employed: numberValue(data, "monthly_net_income") > 0,
       monthly_net_income: numberValue(data, "monthly_net_income"),
+      monthly_gross_income_for_tax: numberValue(data, "monthly_gross_income_for_tax"),
       income_growth_rate: percentValue(data, "income_growth_rate"),
       retirement_age: retirementAge,
       retirement_allowance: numberValue(data, "retirement_allowance"),
