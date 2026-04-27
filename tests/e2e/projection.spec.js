@@ -7,7 +7,6 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await page.locator('[name="spouse_birth_date"]').fill("1978-07-09");
   await page.getByLabel("분석 시작 월").fill("2026-05");
   await page.getByLabel("은퇴 목표 연령").fill("58");
-  await page.getByLabel("퇴직 후 목표 월수입").fill("4,800,000");
   await page.getByLabel("현재 월 세후 근로소득").fill("6,100,000");
   await page.getByLabel("근로소득 연 상승률(%)").fill("2.5");
   await page.getByLabel("월 생활비").fill("12,000,000");
@@ -38,16 +37,12 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await page.getByLabel("주식/투자 연 예상수익률(%)").fill("5.5");
   await page.getByLabel("배당/이자 월수입").fill("250,000");
   await page.getByLabel("물가상승률(%)").fill("2.2");
-  await page.getByLabel("퇴직 후 목표 월수입").blur();
-
-  await expect(page.getByLabel("퇴직 후 목표 월수입")).toHaveValue("4,800,000");
 
   await page.getByRole("button", { name: "프로젝션 계산" }).click();
 
   await expect(page.locator("#summary")).toContainText("기간");
   await expect(page.locator("#summary")).toContainText("추천");
   await expect(page.locator("#summary")).toContainText("월 추가 저축 필요액");
-  await expect(page.locator("#summary")).toContainText("4,800,000");
 
   await expect(page.locator("#projection-table")).toContainText("2026-05");
   await expect(page.locator("#projection-body")).toContainText("근로소득");

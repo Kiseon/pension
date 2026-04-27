@@ -7,7 +7,6 @@ from pension_service.projection import Month, default_national_pension_age, nati
 def sample_payload():
     return {
         "start_month": "2026-01",
-        "target_monthly_income": 4_000_000,
         "household": {
             "user_birth_date": "1970-05-20",
             "spouse_birth_date": "1972-03-10",
@@ -66,8 +65,6 @@ def sample_payload():
 class ProjectionTests(unittest.TestCase):
     def test_projection_runs_to_age_100_when_assets_do_not_deplete_early(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
-
         result = project(payload)
 
         self.assertEqual(result["market"], "KR")
@@ -78,7 +75,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_projection_runs_to_age_100_even_when_cash_is_negative(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["financial_assets"][0]["balance"] = 0
         payload["irp"]["current_balance"] = 0
         payload["irp"]["monthly_contribution"] = 0
@@ -99,7 +95,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_health_and_national_pension_expenses_after_retirement(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["retirement_age"] = 58
         result = project(payload)
         row = next(row for row in result["monthly"] if row["month"] == "2029-06")
@@ -112,7 +107,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_housing_pension_pricing_uses_younger_of_couple(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["retirement_age"] = 58
         payload["household"]["spouse_birth_date"] = "1975-05-20"
         payload["pensions"] = [
@@ -152,7 +146,6 @@ class ProjectionTests(unittest.TestCase):
 
         payload = {
             "start_month": "2026-07",
-            "target_monthly_income": 0,
             "household": {"user_birth_date": "1965-06-15"},
             "employment": {
                 "currently_employed": False,
@@ -183,7 +176,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_surplus_after_retirement_splits_by_stock_allocation_rate(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["retirement_age"] = 58
         payload["employment"]["retirement_allowance"] = 0
         payload["employment"]["voluntary_retirement_bonus"] = 0
@@ -217,7 +209,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_real_estate_income_grows_annually_not_monthly(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["real_estate"][0]["income_growth_rate"] = 0.12
         result = project(payload)
 
@@ -233,7 +224,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_employment_income_grows_annually_not_monthly(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["income_growth_rate"] = 0.12
         result = project(payload)
 
@@ -254,7 +244,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_irp_contributions_stop_at_retirement_month(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["retirement_allowance"] = 0
         payload["employment"]["voluntary_retirement_bonus"] = 0
         payload["financial_assets"] = []
@@ -277,7 +266,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_pension_payout_starts_after_retirement_even_if_start_age_is_earlier(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["pensions"][0]["start_age"] = 55
         result = project(payload)
 
@@ -292,7 +280,6 @@ class ProjectionTests(unittest.TestCase):
 
     def test_health_insurance_counts_pension_income_at_30_percent(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 0
         payload["employment"]["retirement_age"] = 58
         payload["real_estate"] = []
         payload["financial_assets"] = []
@@ -308,9 +295,41 @@ class ProjectionTests(unittest.TestCase):
         expected = round(20_160 * 1.1314)
         self.assertEqual(health, expected)
 
-    def test_recommendation_reports_shortfall_when_target_is_too_high(self):
+    def test_positive_monthly_cashflow_splits_cash_and_stock_while_employed(self):
+        payload = {
+            "start_month": "2026-01",
+            "household": {"user_birth_date": "1975-01-01"},
+            "employment": {
+                "currently_employed": True,
+                "monthly_net_income": 2_000_000,
+                "income_growth_rate": 0,
+                "retirement_age": 65,
+                "retirement_allowance": 0,
+                "voluntary_retirement_bonus": 0,
+            },
+            "real_estate": [],
+            "pensions": [],
+            "financial_assets": [{"name": "주식", "balance": 0, "annual_return_rate": 0, "monthly_income": 0}],
+            "irp": {
+                "current_balance": 0,
+                "monthly_contribution": 0,
+                "annual_return_rate": 0,
+                "payout_start_year": 2100,
+                "payout_end_year": 2100,
+            },
+            "expenses": {"monthly_living_expense": 0, "stock_allocation_rate": 0.5},
+            "assumptions": {"inflation_rate": 0},
+        }
+        result = project(payload)
+        row = result["monthly"][0]
+        nominal = row["nominal_total"]
+        self.assertGreater(nominal, 0)
+        self.assertEqual(row["cash_balance"], nominal // 2)
+        self.assertEqual(row["stock_balance"], nominal - row["cash_balance"])
+
+    def test_recommendation_notes_stress_when_cash_negative_after_retirement(self):
         payload = sample_payload()
-        payload["target_monthly_income"] = 20_000_000
+        payload["employment"]["retirement_age"] = 58
         payload["expenses"]["monthly_living_expense"] = 25_000_000
         payload["financial_assets"][0]["balance"] = 1_000_000
         payload["irp"]["current_balance"] = 0
@@ -318,7 +337,7 @@ class ProjectionTests(unittest.TestCase):
 
         result = project(payload)
 
-        self.assertGreater(result["recommendation"]["additional_savings_needed_at_retirement"], 0)
+        self.assertEqual(result["recommendation"]["additional_savings_needed_at_retirement"], 0)
         self.assertIsNotNone(result["recommendation"]["depletion_month"])
 
     def test_month_ordering_helper(self):

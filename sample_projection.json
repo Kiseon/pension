@@ -4,7 +4,6 @@
     "spouse_birth_date": "1977-09-10"
   },
   "start_month": "2026-01",
-  "target_monthly_income": 5000000,
   "employment": {
     "currently_employed": true,
     "monthly_net_income": 6500000,

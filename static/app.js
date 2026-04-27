@@ -70,7 +70,6 @@ function payloadFromForm(data) {
       spouse_birth_date: spouseBirthDate || undefined
     },
     start_month: textValue(data, "start_month"),
-    target_monthly_income: numberValue(data, "target_monthly_income"),
     employment: {
       currently_employed: numberValue(data, "monthly_net_income") > 0,
       monthly_net_income: numberValue(data, "monthly_net_income"),
@@ -133,7 +132,6 @@ function renderResult(data) {
 
   summary.innerHTML = `
     <div><strong>기간</strong>: ${data.projection_start} ~ ${data.projection_end}</div>
-    <div><strong>목표 월수입</strong>: ${formatKrw(data.target_monthly_income)}</div>
     <div><strong>입력 신뢰도</strong>: ${data.confidence_score}점</div>
     <div><strong>추천</strong>: ${data.recommendation.summary}</div>
     <div><strong>은퇴시점 추가 필요액</strong>: ${formatKrw(data.recommendation.additional_savings_needed_at_retirement)}</div>

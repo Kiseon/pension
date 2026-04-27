@@ -173,7 +173,6 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
 
     assumptions = payload.get("assumptions", {})
     inflation = rate(assumptions.get("inflation_rate", "0.02"))
-    target_monthly_income = money(payload.get("target_monthly_income"))
     retirement_age = int(payload.get("employment", {}).get("retirement_age", 65))
     retirement_month = user.month_turning_age(retirement_age)
 
@@ -235,10 +234,11 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         _line(lines, "국민연금 납입", -national_contribution, "national_pension_contribution")
 
         retirement_balance += total_irp_contribution
+        retirement_balance_for_display = retirement_balance
         retirement_balance = _grow_balance(retirement_balance, _retirement_return(payload))
 
         cashflow_total = Decimal(sum(line["amount"] for line in lines))
-        if retirement_month.add(1).months_until(month) >= 0 and cashflow_total > 0:
+        if cashflow_total > 0:
             stock_share = _stock_allocation_fraction(payload)
             cash_part = cashflow_total * (Decimal("1") - stock_share)
             stock_part = cashflow_total * stock_share
@@ -260,7 +260,6 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         annual_assessable_income[month.year] = annual_assessable_income.get(month.year, Decimal("0")) + assessable_income
         months_from_value_base = first_year_january.months_until(month)
         real_total = Decimal(nominal_total) / ((Decimal("1") + monthly_growth(inflation)) ** max(months_from_value_base, 0))
-        shortfall = max(target_monthly_income - Decimal(nominal_total), Decimal("0"))
 
         row = {
             "month": month.as_text(),
@@ -268,16 +267,15 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
             "spouse_age": spouse.age_on_month(month) if spouse else None,
             "nominal_total": int(nominal_total),
             "real_total": round_krw(real_total),
-            "target_shortfall": round_krw(shortfall),
             "remaining_financial_assets": round_krw(cash_balance + stock_balance + retirement_balance),
             "cash_balance": round_krw(cash_balance),
             "stock_balance": round_krw(stock_balance),
-            "retirement_balance": round_krw(retirement_balance),
+            "retirement_balance": round_krw(retirement_balance_for_display),
             "lines": lines,
         }
         monthly_rows.append(row)
 
-    recommendation = _build_recommendation(monthly_rows, payload, retirement_month, target_monthly_income)
+    recommendation = _build_recommendation(monthly_rows, payload, retirement_month)
     confidence = _confidence_score(payload)
 
     return {
@@ -285,7 +283,6 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         "market": "KR",
         "projection_start": start.as_text(),
         "projection_end": monthly_rows[-1]["month"] if monthly_rows else end.as_text(),
-        "target_monthly_income": round_krw(target_monthly_income),
         "confidence_score": confidence,
         "warnings": warnings,
         "recommendation": recommendation,
@@ -591,43 +588,31 @@ def _build_recommendation(
     rows: list[dict[str, Any]],
     payload: dict[str, Any],
     retirement_month: Month,
-    target_monthly_income: Decimal,
 ) -> dict[str, Any]:
-    if not rows or target_monthly_income <= 0:
+    if not rows:
         return {
-            "summary": "목표 월수입이 입력되지 않아 추천 인출 전략을 계산하지 않았습니다.",
+            "summary": "계산 결과가 없습니다.",
             "additional_savings_needed_at_retirement": 0,
             "monthly_additional_savings_until_retirement": 0,
             "depletion_month": None,
         }
 
     retirement_rows = [row for row in rows if Month.parse(row["month"]).months_until(retirement_month) <= 0]
-    first_depletion = next(
-        (
-            row
-            for row in retirement_rows
-            if row.get("cash_balance", row["remaining_financial_assets"]) < 0
-            or (row["remaining_financial_assets"] <= 0 and row["target_shortfall"] > 0)
-        ),
-        None,
-    )
-    total_shortfall = sum(Decimal(row["target_shortfall"]) for row in retirement_rows)
-    current_remaining = Decimal(rows[-1]["remaining_financial_assets"])
-    additional_needed = max(total_shortfall - current_remaining, Decimal("0"))
+    first_cash_stress = next((row for row in retirement_rows if row.get("cash_balance", 0) < 0), None)
+    first_asset_depletion = next((row for row in retirement_rows if row["remaining_financial_assets"] <= 0), None)
+    first_depletion = first_cash_stress or first_asset_depletion
 
-    start = Month.parse(rows[0]["month"])
-    months_until_retirement = max(start.months_until(retirement_month), 1)
-    monthly_needed = additional_needed / Decimal(months_until_retirement)
-
-    if additional_needed > 0:
-        summary = "현재 입력 자산만으로는 목표 월수입을 전 기간 충족하기 어렵습니다."
+    if first_cash_stress:
+        summary = "은퇴 이후 특정 시점에서 현금 잔액이 마이너스로 전환됩니다. 지출·수입 가정을 검토해 보세요."
+    elif first_asset_depletion:
+        summary = "은퇴 이후 잔여 금융자산(현금+주식+퇴직연금)이 소진되는 달이 있습니다."
     else:
-        summary = "현재 입력 자산과 추천 인출 전략으로 목표 월수입 충족 가능성이 있습니다."
+        summary = "입력하신 가정 기준으로 월별 수지와 잔액 흐름을 확인할 수 있습니다."
 
     return {
         "summary": summary,
-        "additional_savings_needed_at_retirement": round_krw(additional_needed),
-        "monthly_additional_savings_until_retirement": round_krw(monthly_needed),
+        "additional_savings_needed_at_retirement": 0,
+        "monthly_additional_savings_until_retirement": 0,
         "depletion_month": first_depletion["month"] if first_depletion else None,
     }
 
@@ -635,7 +620,6 @@ def _build_recommendation(
 def _confidence_score(payload: dict[str, Any]) -> int:
     checks = [
         bool(payload.get("household", {}).get("user_birth_date")),
-        bool(payload.get("target_monthly_income")),
         bool(payload.get("employment")),
         bool(payload.get("pensions")),
         bool(payload.get("financial_assets") or payload.get("irp")),
