@@ -190,7 +190,6 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
     for index, month in enumerate(months):
         lines: list[dict[str, Any]] = []
         stock_balance = _grow_balance(stock_balance, _stock_return(payload))
-        retirement_balance = _grow_balance(retirement_balance, _retirement_return(payload))
         if month == retirement_month:
             retirement_balance += _retirement_lump_sum(payload)
 
@@ -236,15 +235,17 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         _line(lines, "국민연금 납입", -national_contribution, "national_pension_contribution")
 
         retirement_balance += total_irp_contribution
+        retirement_balance = _grow_balance(retirement_balance, _retirement_return(payload))
 
         cashflow_total = Decimal(sum(line["amount"] for line in lines))
-        cash_balance += cashflow_total
         if retirement_month.add(1).months_until(month) >= 0 and cashflow_total > 0:
             stock_share = _stock_allocation_fraction(payload)
-            stock_reinvestment = min(cash_balance, cashflow_total * stock_share)
-            if stock_reinvestment > 0:
-                cash_balance -= stock_reinvestment
-                stock_balance += stock_reinvestment
+            cash_part = cashflow_total * (Decimal("1") - stock_share)
+            stock_part = cashflow_total * stock_share
+            cash_balance += cash_part
+            stock_balance += stock_part
+        else:
+            cash_balance += cashflow_total
         if cash_balance < 0 and stock_balance > 0:
             stock_drawdown = min(stock_balance, -cash_balance)
             stock_balance -= stock_drawdown

@@ -147,6 +147,40 @@ class ProjectionTests(unittest.TestCase):
         self.assertNotIn("본인 IRP 월수령", sources)
         self.assertNotIn("배우자 IRP 월수령", sources)
 
+    def test_retirement_balance_drops_by_full_withdrawal_before_interest(self):
+        """Withdrawal reduces balance by the payout amount; return accrues after flows."""
+
+        payload = {
+            "start_month": "2026-07",
+            "target_monthly_income": 0,
+            "household": {"user_birth_date": "1965-06-15"},
+            "employment": {
+                "currently_employed": False,
+                "monthly_net_income": 0,
+                "income_growth_rate": 0,
+                "retirement_age": 61,
+                "retirement_allowance": 0,
+                "voluntary_retirement_bonus": 0,
+            },
+            "real_estate": [],
+            "pensions": [],
+            "financial_assets": [],
+            "irp": {
+                "current_balance": 600_000,
+                "monthly_contribution": 0,
+                "annual_return_rate": 0,
+                "payout_start_year": 2026,
+                "payout_end_year": 2026,
+            },
+            "expenses": {"monthly_living_expense": 0, "stock_allocation_rate": 0.5},
+            "assumptions": {"inflation_rate": 0},
+        }
+        result = project(payload)
+        row = result["monthly"][0]
+        payout = next(line["amount"] for line in row["lines"] if line["source"] == "퇴직연금/IRP 월수령")
+        self.assertEqual(payout, 100_000)
+        self.assertEqual(row["retirement_balance"], 600_000 - 100_000)
+
     def test_surplus_after_retirement_splits_by_stock_allocation_rate(self):
         payload = sample_payload()
         payload["target_monthly_income"] = 0
