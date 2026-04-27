@@ -56,6 +56,7 @@ function payloadFromForm(data) {
       type: "housing_pension",
       target_monthly_amount: 0,
       owner_birth_date: userBirthDate,
+      spouse_birth_date: spouseBirthDate || undefined,
       start_age: numberValue(data, "housing_pension_start_age"),
       home_value: numberValue(data, "apartment_value"),
       ownership_share: data.get("joint_home_ownership") === "on" ? 0.5 : 1,

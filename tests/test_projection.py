@@ -95,7 +95,7 @@ class ProjectionTests(unittest.TestCase):
         sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
 
         self.assertNotIn("근로소득", sources)
-        self.assertEqual(sources["퇴직금/위로금 월수령"], 840_336)
+        self.assertEqual(sources["퇴직연금/IRP 월수령"], 840_336)
 
     def test_health_and_national_pension_expenses_after_retirement(self):
         payload = sample_payload()
@@ -107,8 +107,79 @@ class ProjectionTests(unittest.TestCase):
 
         self.assertIn("건강보험료", sources)
         self.assertLess(sources["건강보험료"], 0)
-        self.assertIn("국민연금 보험료", sources)
-        self.assertLess(sources["국민연금 보험료"], 0)
+        self.assertIn("국민연금 납입", sources)
+        self.assertLess(sources["국민연금 납입"], 0)
+
+    def test_housing_pension_pricing_uses_younger_of_couple(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["employment"]["retirement_age"] = 58
+        payload["household"]["spouse_birth_date"] = "1975-05-20"
+        payload["pensions"] = [
+            {
+                "name": "주택연금",
+                "type": "housing_pension",
+                "target_monthly_amount": 0,
+                "start_age": 70,
+                "home_value": 900_000_000,
+                "annual_increase_rate": 0,
+            }
+        ]
+
+        with_spouse = project(payload)
+        row_joint = next(row for row in with_spouse["monthly"] if row["month"] == "2040-05")
+        housing_joint = next(line["amount"] for line in row_joint["lines"] if line["source"] == "주택연금")
+
+        payload["household"] = {"user_birth_date": payload["household"]["user_birth_date"]}
+        solo = project(payload)
+        row_solo = next(row for row in solo["monthly"] if row["month"] == "2040-05")
+        housing_solo = next(line["amount"] for line in row_solo["lines"] if line["source"] == "주택연금")
+
+        self.assertLess(housing_joint, housing_solo)
+
+    def test_retirement_payout_and_irp_combined_income_line(self):
+        result = project(sample_payload())
+        row = next(row for row in result["monthly"] if row["month"] == "2030-06")
+        sources = {line["source"]: line["amount"] for line in row["lines"]}
+
+        self.assertIn("퇴직연금/IRP 월수령", sources)
+        self.assertNotIn("퇴직금/위로금 월수령", sources)
+        self.assertNotIn("본인 IRP 월수령", sources)
+        self.assertNotIn("배우자 IRP 월수령", sources)
+
+    def test_surplus_after_retirement_splits_by_stock_allocation_rate(self):
+        payload = sample_payload()
+        payload["target_monthly_income"] = 0
+        payload["employment"]["retirement_age"] = 58
+        payload["employment"]["retirement_allowance"] = 0
+        payload["employment"]["voluntary_retirement_bonus"] = 0
+        payload["real_estate"] = []
+        payload["financial_assets"] = [
+            {"name": "주식", "balance": 0, "annual_return_rate": 0, "monthly_income": 0}
+        ]
+        payload["irp"] = {
+            "current_balance": 0,
+            "monthly_contribution": 0,
+            "annual_return_rate": 0,
+            "payout_start_age": 80,
+            "payout_end_age": 85,
+        }
+        payload["pensions"] = [
+            {
+                "name": "국민연금",
+                "type": "national_pension",
+                "target_monthly_amount": 5_000_000,
+                "start_age": 58,
+                "annual_increase_rate": 0,
+            }
+        ]
+        payload["expenses"]["monthly_living_expense"] = 0
+        payload["expenses"]["stock_allocation_rate"] = 0.25
+
+        result = project(payload)
+        row = next(r for r in result["monthly"] if r["month"] == "2029-01")
+        self.assertGreater(row["stock_balance"], 0)
+        self.assertGreater(row["cash_balance"], row["stock_balance"])
 
     def test_real_estate_income_grows_annually_not_monthly(self):
         payload = sample_payload()

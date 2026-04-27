@@ -23,13 +23,13 @@
         <form id="projection-form" class="panel">
           <h2>기본 입력</h2>
           <div class="paired-fields">
-            <label>
-              본인 생년월일
-              <input name="user_birth_date" type="date" value="1975-04-15" required />
+            <label class="inline-field">
+              <span class="inline-label">본인</span>
+              <input name="user_birth_date" type="date" value="1975-04-15" required title="본인 생년월일" />
             </label>
-            <label>
-              배우자 생년월일
-              <input name="spouse_birth_date" type="date" value="1978-09-10" />
+            <label class="inline-field">
+              <span class="inline-label">배우자</span>
+              <input name="spouse_birth_date" type="date" value="1978-09-10" title="배우자 생년월일" />
             </label>
           </div>
           <label>
@@ -93,26 +93,26 @@
           <div class="paired-group">
             <div class="paired-title">국민연금 정상 월수령액</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="national_pension_amount" type="text" inputmode="numeric" value="1,500,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="national_pension_amount" type="text" inputmode="numeric" value="1,500,000" data-format="money" aria-label="본인 국민연금 정상 월수령액" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_national_pension_amount" type="text" inputmode="numeric" value="1,000,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_national_pension_amount" type="text" inputmode="numeric" value="1,000,000" data-format="money" aria-label="배우자 국민연금 정상 월수령액" />
               </label>
             </div>
           </div>
           <div class="paired-group">
             <div class="paired-title">국민연금 개시 연령</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="national_pension_start_age" type="number" value="65" min="55" max="75" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="national_pension_start_age" type="number" value="65" min="55" max="75" aria-label="본인 국민연금 개시 연령" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_national_pension_start_age" type="number" value="65" min="55" max="75" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_national_pension_start_age" type="number" value="65" min="55" max="75" aria-label="배우자 국민연금 개시 연령" />
               </label>
             </div>
           </div>
@@ -133,52 +133,52 @@
           <div class="paired-group">
             <div class="paired-title">IRP 현재잔액</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="irp_balance" type="text" inputmode="numeric" value="50,000,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="irp_balance" type="text" inputmode="numeric" value="50,000,000" data-format="money" aria-label="본인 IRP 현재잔액" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_irp_balance" type="text" inputmode="numeric" value="30,000,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_irp_balance" type="text" inputmode="numeric" value="30,000,000" data-format="money" aria-label="배우자 IRP 현재잔액" />
               </label>
             </div>
           </div>
           <div class="paired-group">
             <div class="paired-title">IRP 월 납입 계획</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="irp_contribution" type="text" inputmode="numeric" value="500,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="irp_contribution" type="text" inputmode="numeric" value="500,000" data-format="money" aria-label="본인 IRP 월 납입" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_irp_contribution" type="text" inputmode="numeric" value="300,000" data-format="money" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_irp_contribution" type="text" inputmode="numeric" value="300,000" data-format="money" aria-label="배우자 IRP 월 납입" />
               </label>
             </div>
           </div>
           <div class="paired-group">
             <div class="paired-title">IRP 수령 시작 연도</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="irp_payout_start_year" type="number" value="2035" min="2026" max="2100" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="irp_payout_start_year" type="number" value="2035" min="2026" max="2100" aria-label="본인 IRP 수령 시작 연도" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_irp_payout_start_year" type="number" value="2037" min="2026" max="2100" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_irp_payout_start_year" type="number" value="2037" min="2026" max="2100" aria-label="배우자 IRP 수령 시작 연도" />
               </label>
             </div>
           </div>
           <div class="paired-group">
             <div class="paired-title">IRP 수령 종료 연도</div>
             <div class="paired-fields">
-              <label>
-                본인
-                <input name="irp_payout_end_year" type="number" value="2054" min="2026" max="2100" />
+              <label class="inline-field">
+                <span class="inline-label">본인</span>
+                <input name="irp_payout_end_year" type="number" value="2054" min="2026" max="2100" aria-label="본인 IRP 수령 종료 연도" />
               </label>
-              <label>
-                배우자
-                <input name="spouse_irp_payout_end_year" type="number" value="2056" min="2026" max="2100" />
+              <label class="inline-field">
+                <span class="inline-label">배우자</span>
+                <input name="spouse_irp_payout_end_year" type="number" value="2056" min="2026" max="2100" aria-label="배우자 IRP 수령 종료 연도" />
               </label>
             </div>
           </div>

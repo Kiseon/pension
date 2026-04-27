@@ -68,7 +68,7 @@ body {
 .app-shell {
   display: grid;
   gap: 22px;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
   margin: 0 auto;
   max-width: 1680px;
   padding: 22px 28px 32px;
@@ -136,6 +136,46 @@ label {
 
 .field-row label {
   margin: 0;
+}
+
+.paired-group {
+  margin: 12px 0;
+}
+
+.paired-title {
+  color: var(--slate-700);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+.paired-fields {
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.paired-fields label.inline-field {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin: 0;
+}
+
+.paired-fields label.inline-field .inline-label {
+  color: var(--slate-700);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 2.75em;
+}
+
+.paired-fields label.inline-field input {
+  flex: 1 1 auto;
+  max-width: 11rem;
+  min-width: 0;
 }
 
 input {
@@ -324,6 +364,10 @@ tbody tr:nth-child(even) .sticky-col {
   }
 
   .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .paired-fields {
     grid-template-columns: 1fr;
   }
 }

@@ -199,22 +199,22 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
 
         retirement_payout = min(_retirement_payout_income(payload, user, month, retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= retirement_payout
-        _line(lines, "퇴직금/위로금 월수령", retirement_payout, "retirement_payout")
 
         irp_payout = min(_irp_payout(payload, month, "payout", retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= irp_payout
-        _line(lines, "본인 IRP 월수령", irp_payout, "irp_payout")
 
         spouse_irp_payout = min(_irp_payout(payload, month, "spouse_payout", retirement_month), max(retirement_balance, Decimal("0")))
         retirement_balance -= spouse_irp_payout
-        _line(lines, "배우자 IRP 월수령", spouse_irp_payout, "irp_payout")
+
+        retirement_irp_income = retirement_payout + irp_payout + spouse_irp_payout
+        _line(lines, "퇴직연금/IRP 월수령", retirement_irp_income, "retirement_irp_payout")
 
         for item in payload.get("real_estate", []):
             income, expense = _real_estate_cashflow(item, month, first_projection_month)
             _line(lines, f"{_source_name(item, '부동산')} 수입", income, "real_estate_income")
             _line(lines, f"{_source_name(item, '부동산')} 비용", -expense, "real_estate_expense")
 
-        pension_lines = _pension_cashflows(payload, user, month, first_projection_month, retirement_month)
+        pension_lines = _pension_cashflows(payload, user, spouse, month, first_projection_month, retirement_month)
         for source, amount in pension_lines:
             _line(lines, source, amount, "pension")
 
@@ -225,20 +225,23 @@ def project(payload: dict[str, Any]) -> dict[str, Any]:
         _line(lines, "생활비", -living_expense, "living_expense")
 
         irp_contribution = _irp_contribution(payload, month, retirement_month)
-        _line(lines, "IRP 납입", -irp_contribution, "irp_contribution")
+        spouse_irp_contribution = _spouse_irp_contribution(payload, month, retirement_month)
+        total_irp_contribution = irp_contribution + spouse_irp_contribution
+        _line(lines, "IRP 납입", -total_irp_contribution, "irp_contribution")
 
         health_premium = _health_insurance_premium(annual_assessable_income.get(month.year - 1, Decimal("0"))) if retirement_month.months_until(month) >= 0 else Decimal("0")
         _line(lines, "건강보험료", -health_premium, "health_insurance")
 
         national_contribution = _national_pension_contribution(payload, user, month, retirement_month, lines)
-        _line(lines, "국민연금 보험료", -national_contribution, "national_pension_contribution")
+        _line(lines, "국민연금 납입", -national_contribution, "national_pension_contribution")
 
-        retirement_balance += irp_contribution
+        retirement_balance += total_irp_contribution
 
         cashflow_total = Decimal(sum(line["amount"] for line in lines))
         cash_balance += cashflow_total
         if retirement_month.add(1).months_until(month) >= 0 and cashflow_total > 0:
-            stock_reinvestment = min(cash_balance, cashflow_total / Decimal("2"))
+            stock_share = _stock_allocation_fraction(payload)
+            stock_reinvestment = min(cash_balance, cashflow_total * stock_share)
             if stock_reinvestment > 0:
                 cash_balance -= stock_reinvestment
                 stock_balance += stock_reinvestment
@@ -339,7 +342,14 @@ def _real_estate_cashflow(item: dict[str, Any], month: Month, start: Month) -> t
     return income, expense
 
 
-def _pension_cashflows(payload: dict[str, Any], user: Person, month: Month, start: Month, retirement_month: Month) -> list[tuple[str, Decimal]]:
+def _pension_cashflows(
+    payload: dict[str, Any],
+    user: Person,
+    spouse: Person | None,
+    month: Month,
+    start: Month,
+    retirement_month: Month,
+) -> list[tuple[str, Decimal]]:
     results: list[tuple[str, Decimal]] = []
     for item in payload.get("pensions", []):
         owner_birth = item.get("owner_birth_date") or payload["household"]["user_birth_date"]
@@ -352,7 +362,7 @@ def _pension_cashflows(payload: dict[str, Any], user: Person, month: Month, star
         pension_type = str(item.get("type", "")).lower()
         monthly_amount = money(item.get("target_monthly_amount"))
         if pension_type in {"housing", "housing_pension", "주택연금"} and monthly_amount <= 0:
-            pricing_age = _housing_pension_pricing_age(item, owner, start_month)
+            pricing_age = _housing_pension_pricing_age(item, owner, start_month, spouse)
             monthly_amount = _estimate_housing_pension(item, pricing_age)
         if pension_type in {"national", "국민연금", "national_pension"}:
             normal_age = int(item.get("normal_start_age") or default_national_pension_age(owner.birth_date.year))
@@ -386,6 +396,12 @@ def _irp_contribution(payload: dict[str, Any], month: Month, retirement_month: M
     return money(payload.get("irp", {}).get("monthly_contribution"))
 
 
+def _spouse_irp_contribution(payload: dict[str, Any], month: Month, retirement_month: Month) -> Decimal:
+    if retirement_month.months_until(month) >= 0:
+        return Decimal("0")
+    return money(payload.get("irp", {}).get("spouse_monthly_contribution"))
+
+
 def _irp_payout(payload: dict[str, Any], month: Month, prefix: str, retirement_month: Month) -> Decimal:
     irp = payload.get("irp", {})
     start_year = int(irp.get(f"{prefix}_start_year") or 0)
@@ -413,7 +429,7 @@ def _health_insurance_premium(previous_year_income: Decimal) -> Decimal:
 
 def _health_assessable_income(lines: list[dict[str, Any]]) -> Decimal:
     total = Decimal("0")
-    pension_categories = {"pension", "retirement_payout", "irp_payout"}
+    pension_categories = {"pension", "retirement_payout", "irp_payout", "retirement_irp_payout"}
     excluded_categories = {"recommended_withdrawal"}
     for line in lines:
         amount = Decimal(line["amount"])
@@ -473,11 +489,15 @@ def _estimate_housing_pension(item: dict[str, Any], start_age: int) -> Decimal:
     return recognized_value * monthly_rate
 
 
-def _housing_pension_pricing_age(item: dict[str, Any], owner: Person, start_month: Month) -> int:
+def _housing_pension_pricing_age(item: dict[str, Any], owner: Person, start_month: Month, spouse: Person | None) -> int:
+    """Joint housing pension uses the younger of the couple at benefit start (MVP rule)."""
+
     ages = [owner.age_on_month(start_month)]
     spouse_birth = item.get("spouse_birth_date")
     if spouse_birth:
         ages.append(Person.parse(spouse_birth).age_on_month(start_month))
+    elif spouse is not None:
+        ages.append(spouse.age_on_month(start_month))
     return max(min(ages), 55)
 
 
@@ -557,6 +577,13 @@ def _expense_settings(payload: dict[str, Any]) -> dict[str, Any]:
         "stock_allocation_rate": assumptions.get("stock_allocation_rate", 0.5),
         "living_expense_growth_rate": assumptions.get("living_expense_growth_rate", assumptions.get("inflation_rate", 0)),
     }
+
+
+def _stock_allocation_fraction(payload: dict[str, Any]) -> Decimal:
+    raw = money(_expense_settings(payload).get("stock_allocation_rate"), STOCK_ALLOCATION_RATE)
+    if raw > Decimal("1"):
+        raw = raw / Decimal("100")
+    return min(max(raw, Decimal("0")), Decimal("1"))
 
 
 def _build_recommendation(

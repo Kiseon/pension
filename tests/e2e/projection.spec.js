@@ -3,8 +3,8 @@ const { test, expect } = require("@playwright/test");
 test("calculates a projection from form inputs", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByLabel("본인 생년월일").fill("1976-02-14");
-  await page.getByLabel("배우자 생년월일").fill("1978-07-09");
+  await page.locator('[name="user_birth_date"]').fill("1976-02-14");
+  await page.locator('[name="spouse_birth_date"]').fill("1978-07-09");
   await page.getByLabel("분석 시작 월").fill("2026-05");
   await page.getByLabel("은퇴 목표 연령").fill("58");
   await page.getByLabel("퇴직 후 목표 월수입").fill("4,800,000");
@@ -54,9 +54,9 @@ test("calculates a projection from form inputs", async ({ page }) => {
   await expect(page.locator("#projection-body")).toContainText("국민연금");
   await expect(page.locator("#projection-body")).toContainText("배우자 국민연금");
   await expect(page.locator("#projection-body")).toContainText("건강보험료");
-  await expect(page.locator("#projection-body")).toContainText("국민연금 보험료");
+  await expect(page.locator("#projection-body")).toContainText("국민연금 납입");
   await expect(page.locator("#projection-body")).toContainText("생활비");
-  await expect(page.locator("#projection-body")).toContainText("퇴직금/위로금 월수령");
+  await expect(page.locator("#projection-body")).toContainText("퇴직연금/IRP 월수령");
   await expect(page.locator("#projection-body")).toContainText("주택연금");
   await expect(page.locator("#projection-body")).toContainText("현금 잔액");
   await expect(page.locator("#projection-body")).toContainText("주식 잔액");
