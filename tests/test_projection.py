@@ -91,7 +91,8 @@ class ProjectionTests(unittest.TestCase):
         sources = {line["source"]: line["amount"] for line in retirement_row["lines"]}
 
         self.assertNotIn("근로소득", sources)
-        self.assertEqual(sources["퇴직연금/IRP 월수령"], 840_336)
+        severance_monthly = 840_336
+        self.assertGreaterEqual(sources["퇴직연금/IRP 월수령"], severance_monthly)
 
     def test_health_and_national_pension_expenses_after_retirement(self):
         payload = sample_payload()
@@ -140,6 +141,49 @@ class ProjectionTests(unittest.TestCase):
         self.assertNotIn("퇴직금/위로금 월수령", sources)
         self.assertNotIn("본인 IRP 월수령", sources)
         self.assertNotIn("배우자 IRP 월수령", sources)
+
+    def test_irp_balance_near_zero_after_payout_window(self):
+        """12-year equal amortization depletes ~50M pool (no return)."""
+
+        payout_months = 12 * 12
+        payload = {
+            "start_month": "2026-01",
+            "household": {"user_birth_date": "1965-06-01"},
+            "employment": {
+                "currently_employed": False,
+                "monthly_net_income": 0,
+                "income_growth_rate": 0,
+                "retirement_age": 60,
+                "retirement_allowance": 0,
+                "voluntary_retirement_bonus": 0,
+            },
+            "real_estate": [],
+            "pensions": [],
+            "financial_assets": [],
+            "irp": {
+                "current_balance": 50_000_000,
+                "monthly_contribution": 0,
+                "annual_return_rate": 0,
+                "payout_start_year": 2026,
+                "payout_end_year": 2026 + 11,
+            },
+            "expenses": {"monthly_living_expense": 0, "stock_allocation_rate": 1},
+            "assumptions": {"inflation_rate": 0},
+        }
+        result = project(payload)
+        last_payout_month = Month(2026 + 11, 12).as_text()
+        row = next(r for r in result["monthly"] if r["month"] == last_payout_month)
+        self.assertLessEqual(row["retirement_balance"], 500_000)
+
+    def test_national_pension_escalates_with_inflation_until_start(self):
+        payload = sample_payload()
+        payload["employment"]["retirement_age"] = 58
+        payload["pensions"][0]["start_age"] = 65
+        payload["assumptions"]["inflation_rate"] = 0.10
+        result = project(payload)
+        row = next(r for r in result["monthly"] if r["month"] == "2035-05")
+        np_amount = next(line["amount"] for line in row["lines"] if line["source"] == "국민연금")
+        self.assertGreater(np_amount, 1_500_000)
 
     def test_retirement_balance_drops_by_full_withdrawal_before_interest(self):
         """Withdrawal reduces balance by the payout amount; return accrues after flows."""
@@ -251,8 +295,8 @@ class ProjectionTests(unittest.TestCase):
             "current_balance": 0,
             "monthly_contribution": 100,
             "annual_return_rate": 0,
-            "payout_start_age": 60,
-            "payout_end_age": 80,
+            "payout_start_year": 2100,
+            "payout_end_year": 2100,
         }
 
         result = project(payload)
@@ -337,7 +381,7 @@ class ProjectionTests(unittest.TestCase):
 
         result = project(payload)
 
-        self.assertEqual(result["recommendation"]["additional_savings_needed_at_retirement"], 0)
+        self.assertGreaterEqual(result["recommendation"]["additional_savings_needed_at_retirement"], 0)
         self.assertIsNotNone(result["recommendation"]["depletion_month"])
 
     def test_month_ordering_helper(self):

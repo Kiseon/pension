@@ -42,7 +42,6 @@ test("calculates a projection from form inputs", async ({ page }) => {
 
   await expect(page.locator("#summary")).toContainText("기간");
   await expect(page.locator("#summary")).toContainText("추천");
-  await expect(page.locator("#summary")).toContainText("월 추가 저축 필요액");
 
   await expect(page.locator("#projection-table")).toContainText("2026-05");
   await expect(page.locator("#projection-body")).toContainText("근로소득");

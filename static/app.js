@@ -135,7 +135,6 @@ function renderResult(data) {
     <div><strong>입력 신뢰도</strong>: ${data.confidence_score}점</div>
     <div><strong>추천</strong>: ${data.recommendation.summary}</div>
     <div><strong>은퇴시점 추가 필요액</strong>: ${formatKrw(data.recommendation.additional_savings_needed_at_retirement)}</div>
-    <div><strong>월 추가 저축 필요액</strong>: ${formatKrw(data.recommendation.monthly_additional_savings_until_retirement)}</div>
     <div><strong>자산 소진 예상월</strong>: ${data.recommendation.depletion_month || "없음"}</div>
   `;
 
