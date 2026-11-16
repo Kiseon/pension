@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { Briefcase, Building2, Calculator, Check, Landmark, PiggyBank, RotateCcw, Save, Undo2, Users } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Briefcase, Building2, Calculator, Check, Download, Landmark, PiggyBank, RotateCcw, Save, Undo2, Upload, Users } from "lucide-react";
 import type { ProjectionFormState } from "../types/projection";
 import { INPUT_PRESETS } from "../utils/format";
-import { formatSavedTimestamp } from "../utils/storage";
+import { formatSavedTimestamp, parseImportedFormJson } from "../utils/storage";
 import { MoneyInput } from "./MoneyInput";
 
 type InputTab = "household" | "employment" | "pension" | "assets";
@@ -13,6 +13,8 @@ interface InputStudioProps {
   onSubmit: () => void;
   onSave: () => void;
   onRestoreSaved: () => void;
+  onExportJson: () => void;
+  onImportJson: (form: ProjectionFormState) => void;
   onReset: () => void;
   lastSavedAt: string | null;
   justSaved: boolean;
@@ -33,6 +35,8 @@ export const InputStudio: React.FC<InputStudioProps> = ({
   onSubmit,
   onSave,
   onRestoreSaved,
+  onExportJson,
+  onImportJson,
   onReset,
   lastSavedAt,
   justSaved,
@@ -40,6 +44,22 @@ export const InputStudio: React.FC<InputStudioProps> = ({
   isDirty
 }) => {
   const [activeTab, setActiveTab] = useState<InputTab>("household");
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const imported = parseImportedFormJson(text);
+      setImportError(null);
+      onImportJson(imported);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "파일을 불러오지 못했습니다.");
+    }
+  };
 
   const setField = <K extends keyof ProjectionFormState>(
     key: K,
@@ -561,10 +581,32 @@ export const InputStudio: React.FC<InputStudioProps> = ({
               입력값이 변경되었습니다. 버튼을 눌러 재계산하세요.
             </div>
           )}
+          {importError && <div className="dirty-notice text-danger">{importError}</div>}
           <button type="submit" className="btn-primary-full" disabled={loading}>
             <Calculator size={16} />
-            {loading ? "프로젝션 계산 중..." : "프로젝션 계산"}
+            {loading ? "프로젝션 계산 중..." : "프로젝션 계산 (자동 저장)"}
           </button>
+          <div className="footer-io-row">
+            <button type="button" className="btn-ghost-sm" onClick={onExportJson}>
+              <Download size={13} />
+              JSON 백업
+            </button>
+            <button
+              type="button"
+              className="btn-ghost-sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={13} />
+              JSON 불러오기
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
+          </div>
         </div>
       </form>
     </aside>

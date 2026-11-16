@@ -16,7 +16,7 @@ import type {
   ValuationMode
 } from "./types/projection";
 import { buildPayload, DEFAULT_FORM_STATE } from "./utils/format";
-import { loadSavedForm, saveFormSnapshot } from "./utils/storage";
+import { loadSavedForm, saveFormSnapshot, exportFormJson } from "./utils/storage";
 
 const RESULT_TABS: Array<{ id: ResultTab; label: string; icon: React.ReactNode }> = [
   { id: "overview", label: "개요 & 차트", icon: <BarChart3 size={15} /> },
@@ -44,23 +44,30 @@ export const App: React.FC = () => {
   const [valuationMode, setValuationMode] = useState<ValuationMode>("nominal");
   const [resultTab, setResultTab] = useState<ResultTab>("overview");
 
-  const executeProjection = useCallback(async (targetForm: ProjectionFormState) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await runProjection(buildPayload(targetForm));
-      setResult(data);
-      setAppliedForm(targetForm);
-      setIsDirty(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "프로젝션 계산 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const executeProjection = useCallback(
+    async (targetForm: ProjectionFormState, saveOnSuccess = false) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await runProjection(buildPayload(targetForm));
+        setResult(data);
+        setAppliedForm(targetForm);
+        setIsDirty(false);
+        if (saveOnSuccess) {
+          const snapshot = saveFormSnapshot(targetForm);
+          setLastSavedAt(snapshot.savedAt);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "프로젝션 계산 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    void executeProjection(initialSnapshot?.form ?? DEFAULT_FORM_STATE);
+    void executeProjection(initialSnapshot?.form ?? DEFAULT_FORM_STATE, false);
   }, [executeProjection, initialSnapshot]);
 
   const handleFormChange = (
@@ -83,12 +90,23 @@ export const App: React.FC = () => {
     if (!snapshot) return;
     setForm(snapshot.form);
     setLastSavedAt(snapshot.savedAt);
-    void executeProjection(snapshot.form);
+    void executeProjection(snapshot.form, false);
+  };
+
+  const handleImportForm = (imported: ProjectionFormState) => {
+    setForm(imported);
+    const snapshot = saveFormSnapshot(imported);
+    setLastSavedAt(snapshot.savedAt);
+    void executeProjection(imported, false);
+  };
+
+  const handleExportForm = () => {
+    exportFormJson(form);
   };
 
   const handleReset = () => {
     setForm(DEFAULT_FORM_STATE);
-    void executeProjection(DEFAULT_FORM_STATE);
+    void executeProjection(DEFAULT_FORM_STATE, false);
   };
 
   return (
@@ -128,9 +146,11 @@ export const App: React.FC = () => {
         <InputStudio
           form={form}
           onChange={handleFormChange}
-          onSubmit={() => void executeProjection(form)}
+          onSubmit={() => void executeProjection(form, true)}
           onSave={handleSave}
           onRestoreSaved={handleRestoreSaved}
+          onExportJson={handleExportForm}
+          onImportJson={handleImportForm}
           onReset={handleReset}
           lastSavedAt={lastSavedAt}
           justSaved={justSaved}

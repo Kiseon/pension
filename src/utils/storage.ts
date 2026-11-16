@@ -59,3 +59,37 @@ export function formatSavedTimestamp(iso: string): string {
     minute: "2-digit"
   });
 }
+
+export function exportFormJson(form: ProjectionFormState): void {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    form
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json;charset=utf-8"
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `pension-inputs-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function parseImportedFormJson(rawText: string): ProjectionFormState {
+  const parsed = JSON.parse(rawText) as { form?: Partial<ProjectionFormState> } | Partial<ProjectionFormState>;
+  const candidate =
+    parsed && typeof parsed === "object" && "form" in parsed && parsed.form
+      ? parsed.form
+      : (parsed as Partial<ProjectionFormState>);
+
+  if (!candidate || typeof candidate !== "object" || !("userBirthDate" in candidate)) {
+    throw new Error("올바른 입력값 JSON 파일이 아닙니다.");
+  }
+
+  return {
+    ...DEFAULT_FORM_STATE,
+    ...candidate
+  };
+}
