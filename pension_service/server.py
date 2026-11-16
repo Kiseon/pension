@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import argparse
+import json
+import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -11,14 +12,33 @@ from urllib.parse import urlparse
 from pension_service.projection import project
 
 ROOT = Path(__file__).resolve().parent.parent
+DIST_DIR = ROOT / "dist"
 STATIC_DIR = ROOT / "static"
 
 
 class PensionHandler(BaseHTTPRequestHandler):
-    server_version = "PensionMVP/0.1"
+    server_version = "PensionMVP/0.2"
 
     def do_GET(self) -> None:  # noqa: N802 - http.server uses this naming
         path = urlparse(self.path).path
+        if path == "/api/health":
+            self._send_json({"status": "ok"})
+            return
+
+        if DIST_DIR.exists():
+            if path == "/" or path == "":
+                self._send_file(DIST_DIR / "index.html", "text/html; charset=utf-8")
+                return
+            relative = path.lstrip("/")
+            candidate = (DIST_DIR / relative).resolve()
+            if candidate.is_file() and str(candidate).startswith(str(DIST_DIR.resolve())):
+                content_type, _ = mimetypes.guess_type(str(candidate))
+                self._send_file(candidate, content_type or "application/octet-stream")
+                return
+            if not path.startswith("/api/"):
+                self._send_file(DIST_DIR / "index.html", "text/html; charset=utf-8")
+                return
+
         if path == "/":
             self._send_file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
             return
@@ -27,9 +47,6 @@ class PensionHandler(BaseHTTPRequestHandler):
             return
         if path == "/static/styles.css":
             self._send_file(STATIC_DIR / "styles.css", "text/css; charset=utf-8")
-            return
-        if path == "/api/health":
-            self._send_json({"status": "ok"})
             return
         self.send_error(404, "Not Found")
 

@@ -7,22 +7,26 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "python3 -m unittest discover -s tests && npm run test:e2e",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "python3 -m unittest discover -s tests && npm run build && npm run test:e2e",
     "test:unit": "python3 -m unittest discover -s tests",
     "test:e2e": "playwright test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Kiseon/pension.git"
+  "dependencies": {
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "UNLICENSED",
-  "bugs": {
-    "url": "https://github.com/Kiseon/pension/issues"
-  },
-  "homepage": "https://github.com/Kiseon/pension#readme",
   "devDependencies": {
-    "@playwright/test": "^1.59.1"
+    "@playwright/test": "^1.59.1",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
   }
 }

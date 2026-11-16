@@ -17,14 +17,22 @@ IRP, 저축, 주식 투자금 등 수입 창출 수단을 입력받아 본인이
 
 ## MVP 실행
 
-이 저장소에는 Python 표준 라이브러리만으로 실행되는 초기 MVP가 포함되어 있습니다.
+이 저장소는 Python 계산 엔진([`pension_service`](pension_service/))과 TypeScript + React 프론트엔드([`src`](src/))로 구성되어 있습니다.
 
 ```bash
+npm install
+npm run build
 python3 -m pension_service.server
 ```
 
-브라우저에서 `http://localhost:8000`을 열면 샘플 입력을 수정해 월별
-프로젝션을 실행할 수 있습니다.
+브라우저에서 `http://localhost:8000`을 열면 React 기반 노후 수입 설계 대시보드를 사용할 수 있습니다.
+
+프론트엔드 개발 서버(HMR)를 사용하려면 백엔드와 함께 Vite 개발 서버를 실행합니다:
+
+```bash
+python3 -m pension_service.server
+npm run dev
+```
 
 ## API
 
